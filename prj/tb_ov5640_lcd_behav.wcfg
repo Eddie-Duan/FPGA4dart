@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="tb_ov5640_lcd_behav.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="tb_ov5640_lcd" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="174881000000fs"></ZoomStartTime>
+      <ZoomEndTime time="175325500001fs"></ZoomEndTime>
+      <Cursor1Time time="175175000000fs"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="276"></NameColumnWidth>
+      <ValueColumnWidth column_width="120"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="93" />
+   <wvobject fp_name="/tb_ov5640_lcd/sys_clk" type="logic">
+      <obj_property name="ElementShortName">sys_clk</obj_property>
+      <obj_property name="ObjectShortName">sys_clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/sys_rst_n" type="logic">
+      <obj_property name="ElementShortName">sys_rst_n</obj_property>
+      <obj_property name="ObjectShortName">sys_rst_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/led" type="array">
+      <obj_property name="ElementShortName">led[1:0]</obj_property>
+      <obj_property name="ObjectShortName">led[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_reset_n" type="logic">
+      <obj_property name="ElementShortName">ddr3_reset_n</obj_property>
+      <obj_property name="ObjectShortName">ddr3_reset_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_dq_fpga" type="array">
+      <obj_property name="ElementShortName">ddr3_dq_fpga[15:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_dq_fpga[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_dqs_p_fpga" type="array">
+      <obj_property name="ElementShortName">ddr3_dqs_p_fpga[1:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_dqs_p_fpga[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_dqs_n_fpga" type="array">
+      <obj_property name="ElementShortName">ddr3_dqs_n_fpga[1:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_dqs_n_fpga[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_addr_fpga" type="array">
+      <obj_property name="ElementShortName">ddr3_addr_fpga[13:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_addr_fpga[13:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_ba_fpga" type="array">
+      <obj_property name="ElementShortName">ddr3_ba_fpga[2:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_ba_fpga[2:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_ras_n_fpga" type="logic">
+      <obj_property name="ElementShortName">ddr3_ras_n_fpga</obj_property>
+      <obj_property name="ObjectShortName">ddr3_ras_n_fpga</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_cas_n_fpga" type="logic">
+      <obj_property name="ElementShortName">ddr3_cas_n_fpga</obj_property>
+      <obj_property name="ObjectShortName">ddr3_cas_n_fpga</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_we_n_fpga" type="logic">
+      <obj_property name="ElementShortName">ddr3_we_n_fpga</obj_property>
+      <obj_property name="ObjectShortName">ddr3_we_n_fpga</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_cke_fpga" type="array">
+      <obj_property name="ElementShortName">ddr3_cke_fpga[0:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_cke_fpga[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_ck_p_fpga" type="array">
+      <obj_property name="ElementShortName">ddr3_ck_p_fpga[0:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_ck_p_fpga[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_ck_n_fpga" type="array">
+      <obj_property name="ElementShortName">ddr3_ck_n_fpga[0:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_ck_n_fpga[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/init_calib_complete" type="logic">
+      <obj_property name="ElementShortName">init_calib_complete</obj_property>
+      <obj_property name="ObjectShortName">init_calib_complete</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_cs_n_fpga" type="array">
+      <obj_property name="ElementShortName">ddr3_cs_n_fpga[0:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_cs_n_fpga[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_dm_fpga" type="array">
+      <obj_property name="ElementShortName">ddr3_dm_fpga[1:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_dm_fpga[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_odt_fpga" type="array">
+      <obj_property name="ElementShortName">ddr3_odt_fpga[0:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_odt_fpga[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_cs_n_sdram_tmp" type="array">
+      <obj_property name="ElementShortName">ddr3_cs_n_sdram_tmp[0:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_cs_n_sdram_tmp[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_dm_sdram_tmp" type="array">
+      <obj_property name="ElementShortName">ddr3_dm_sdram_tmp[1:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_dm_sdram_tmp[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_odt_sdram_tmp" type="array">
+      <obj_property name="ElementShortName">ddr3_odt_sdram_tmp[0:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_odt_sdram_tmp[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_dq_sdram" type="array">
+      <obj_property name="ElementShortName">ddr3_dq_sdram[15:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_dq_sdram[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_addr_sdram" type="array">
+      <obj_property name="ElementShortName">ddr3_addr_sdram[0:1][13:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_addr_sdram[0:1][13:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_ba_sdram" type="array">
+      <obj_property name="ElementShortName">ddr3_ba_sdram[0:1][2:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_ba_sdram[0:1][2:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_ras_n_sdram" type="logic">
+      <obj_property name="ElementShortName">ddr3_ras_n_sdram</obj_property>
+      <obj_property name="ObjectShortName">ddr3_ras_n_sdram</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_cas_n_sdram" type="logic">
+      <obj_property name="ElementShortName">ddr3_cas_n_sdram</obj_property>
+      <obj_property name="ObjectShortName">ddr3_cas_n_sdram</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_we_n_sdram" type="logic">
+      <obj_property name="ElementShortName">ddr3_we_n_sdram</obj_property>
+      <obj_property name="ObjectShortName">ddr3_we_n_sdram</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_cs_n_sdram" type="array">
+      <obj_property name="ElementShortName">ddr3_cs_n_sdram[0:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_cs_n_sdram[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_odt_sdram" type="array">
+      <obj_property name="ElementShortName">ddr3_odt_sdram[0:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_odt_sdram[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_cke_sdram" type="array">
+      <obj_property name="ElementShortName">ddr3_cke_sdram[0:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_cke_sdram[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_dm_sdram" type="array">
+      <obj_property name="ElementShortName">ddr3_dm_sdram[1:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_dm_sdram[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_dqs_p_sdram" type="array">
+      <obj_property name="ElementShortName">ddr3_dqs_p_sdram[1:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_dqs_p_sdram[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_dqs_n_sdram" type="array">
+      <obj_property name="ElementShortName">ddr3_dqs_n_sdram[1:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_dqs_n_sdram[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_ck_p_sdram" type="array">
+      <obj_property name="ElementShortName">ddr3_ck_p_sdram[0:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_ck_p_sdram[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ddr3_ck_n_sdram" type="array">
+      <obj_property name="ElementShortName">ddr3_ck_n_sdram[0:0]</obj_property>
+      <obj_property name="ObjectShortName">ddr3_ck_n_sdram[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/cam_pclk" type="logic">
+      <obj_property name="ElementShortName">cam_pclk</obj_property>
+      <obj_property name="ObjectShortName">cam_pclk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/cam_vsync" type="logic">
+      <obj_property name="ElementShortName">cam_vsync</obj_property>
+      <obj_property name="ObjectShortName">cam_vsync</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/cam_href" type="logic">
+      <obj_property name="ElementShortName">cam_href</obj_property>
+      <obj_property name="ObjectShortName">cam_href</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/cam_data" type="array">
+      <obj_property name="ElementShortName">cam_data[7:0]</obj_property>
+      <obj_property name="ObjectShortName">cam_data[7:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/cam_rst_n" type="logic">
+      <obj_property name="ElementShortName">cam_rst_n</obj_property>
+      <obj_property name="ObjectShortName">cam_rst_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/cam_pwdn" type="logic">
+      <obj_property name="ElementShortName">cam_pwdn</obj_property>
+      <obj_property name="ObjectShortName">cam_pwdn</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/cam_scl" type="logic">
+      <obj_property name="ElementShortName">cam_scl</obj_property>
+      <obj_property name="ObjectShortName">cam_scl</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/cam_sda" type="logic">
+      <obj_property name="ElementShortName">cam_sda</obj_property>
+      <obj_property name="ObjectShortName">cam_sda</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/lcd_rgb" type="array">
+      <obj_property name="ElementShortName">lcd_rgb[23:0]</obj_property>
+      <obj_property name="ObjectShortName">lcd_rgb[23:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/lcd_de" type="logic">
+      <obj_property name="ElementShortName">lcd_de</obj_property>
+      <obj_property name="ObjectShortName">lcd_de</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/lcd_hs" type="logic">
+      <obj_property name="ElementShortName">lcd_hs</obj_property>
+      <obj_property name="ObjectShortName">lcd_hs</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/lcd_vs" type="logic">
+      <obj_property name="ElementShortName">lcd_vs</obj_property>
+      <obj_property name="ObjectShortName">lcd_vs</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/lcd_clk" type="logic">
+      <obj_property name="ElementShortName">lcd_clk</obj_property>
+      <obj_property name="ObjectShortName">lcd_clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/lcd_rst" type="logic">
+      <obj_property name="ElementShortName">lcd_rst</obj_property>
+      <obj_property name="ObjectShortName">lcd_rst</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/lcd_bl" type="logic">
+      <obj_property name="ElementShortName">lcd_bl</obj_property>
+      <obj_property name="ObjectShortName">lcd_bl</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/cmos_pclk" type="logic">
+      <obj_property name="ElementShortName">cmos_pclk</obj_property>
+      <obj_property name="ObjectShortName">cmos_pclk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/cmos_vsync" type="logic">
+      <obj_property name="ElementShortName">cmos_vsync</obj_property>
+      <obj_property name="ObjectShortName">cmos_vsync</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/cmos_href" type="logic">
+      <obj_property name="ElementShortName">cmos_href</obj_property>
+      <obj_property name="ObjectShortName">cmos_href</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/cmos_data" type="array">
+      <obj_property name="ElementShortName">cmos_data[7:0]</obj_property>
+      <obj_property name="ObjectShortName">cmos_data[7:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/clk" type="logic">
+      <obj_property name="ElementShortName">clk</obj_property>
+      <obj_property name="ObjectShortName">clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/clk_cmos" type="logic">
+      <obj_property name="ElementShortName">clk_cmos</obj_property>
+      <obj_property name="ObjectShortName">clk_cmos</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/lcd_pclk" type="logic">
+      <obj_property name="ElementShortName">lcd_pclk</obj_property>
+      <obj_property name="ObjectShortName">lcd_pclk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/CS_WIDTH" type="array">
+      <obj_property name="ElementShortName">CS_WIDTH[31:0]</obj_property>
+      <obj_property name="ObjectShortName">CS_WIDTH[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/DM_WIDTH" type="array">
+      <obj_property name="ElementShortName">DM_WIDTH[31:0]</obj_property>
+      <obj_property name="ObjectShortName">DM_WIDTH[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/DQ_WIDTH" type="array">
+      <obj_property name="ElementShortName">DQ_WIDTH[31:0]</obj_property>
+      <obj_property name="ObjectShortName">DQ_WIDTH[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/DQS_WIDTH" type="array">
+      <obj_property name="ElementShortName">DQS_WIDTH[31:0]</obj_property>
+      <obj_property name="ObjectShortName">DQS_WIDTH[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ODT_WIDTH" type="array">
+      <obj_property name="ElementShortName">ODT_WIDTH[31:0]</obj_property>
+      <obj_property name="ObjectShortName">ODT_WIDTH[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/ROW_WIDTH" type="array">
+      <obj_property name="ElementShortName">ROW_WIDTH[31:0]</obj_property>
+      <obj_property name="ObjectShortName">ROW_WIDTH[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/TPROP_DQS" type="other">
+      <obj_property name="ElementShortName">TPROP_DQS</obj_property>
+      <obj_property name="ObjectShortName">TPROP_DQS</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/TPROP_DQS_RD" type="other">
+      <obj_property name="ElementShortName">TPROP_DQS_RD</obj_property>
+      <obj_property name="ObjectShortName">TPROP_DQS_RD</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/TPROP_PCB_CTRL" type="other">
+      <obj_property name="ElementShortName">TPROP_PCB_CTRL</obj_property>
+      <obj_property name="ObjectShortName">TPROP_PCB_CTRL</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/TPROP_PCB_DATA" type="other">
+      <obj_property name="ElementShortName">TPROP_PCB_DATA</obj_property>
+      <obj_property name="ObjectShortName">TPROP_PCB_DATA</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/TPROP_PCB_DATA_RD" type="other">
+      <obj_property name="ElementShortName">TPROP_PCB_DATA_RD</obj_property>
+      <obj_property name="ObjectShortName">TPROP_PCB_DATA_RD</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/MEMORY_WIDTH" type="array">
+      <obj_property name="ElementShortName">MEMORY_WIDTH[31:0]</obj_property>
+      <obj_property name="ObjectShortName">MEMORY_WIDTH[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/NUM_COMP" type="array">
+      <obj_property name="ElementShortName">NUM_COMP[31:0]</obj_property>
+      <obj_property name="ObjectShortName">NUM_COMP[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/PERIOD2" type="array">
+      <obj_property name="ElementShortName">PERIOD2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">PERIOD2[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/rst_n" type="logic">
+      <obj_property name="ElementShortName">rst_n</obj_property>
+      <obj_property name="ObjectShortName">rst_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cam_pclk" type="logic">
+      <obj_property name="ElementShortName">cam_pclk</obj_property>
+      <obj_property name="ObjectShortName">cam_pclk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cam_vsync" type="logic">
+      <obj_property name="ElementShortName">cam_vsync</obj_property>
+      <obj_property name="ObjectShortName">cam_vsync</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cam_href" type="logic">
+      <obj_property name="ElementShortName">cam_href</obj_property>
+      <obj_property name="ObjectShortName">cam_href</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cam_data" type="array">
+      <obj_property name="ElementShortName">cam_data[7:0]</obj_property>
+      <obj_property name="ObjectShortName">cam_data[7:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cmos_frame_vsync" type="logic">
+      <obj_property name="ElementShortName">cmos_frame_vsync</obj_property>
+      <obj_property name="ObjectShortName">cmos_frame_vsync</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cmos_frame_href" type="logic">
+      <obj_property name="ElementShortName">cmos_frame_href</obj_property>
+      <obj_property name="ObjectShortName">cmos_frame_href</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cmos_frame_valid" type="logic">
+      <obj_property name="ElementShortName">cmos_frame_valid</obj_property>
+      <obj_property name="ObjectShortName">cmos_frame_valid</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cmos_frame_data" type="array">
+      <obj_property name="ElementShortName">cmos_frame_data[15:0]</obj_property>
+      <obj_property name="ObjectShortName">cmos_frame_data[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cam_vsync_d0" type="logic">
+      <obj_property name="ElementShortName">cam_vsync_d0</obj_property>
+      <obj_property name="ObjectShortName">cam_vsync_d0</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cam_vsync_d1" type="logic">
+      <obj_property name="ElementShortName">cam_vsync_d1</obj_property>
+      <obj_property name="ObjectShortName">cam_vsync_d1</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cam_href_d0" type="logic">
+      <obj_property name="ElementShortName">cam_href_d0</obj_property>
+      <obj_property name="ObjectShortName">cam_href_d0</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cam_href_d1" type="logic">
+      <obj_property name="ElementShortName">cam_href_d1</obj_property>
+      <obj_property name="ObjectShortName">cam_href_d1</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cmos_ps_cnt" type="array">
+      <obj_property name="ElementShortName">cmos_ps_cnt[3:0]</obj_property>
+      <obj_property name="ObjectShortName">cmos_ps_cnt[3:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cam_data_d0" type="array">
+      <obj_property name="ElementShortName">cam_data_d0[7:0]</obj_property>
+      <obj_property name="ObjectShortName">cam_data_d0[7:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/cmos_data_t" type="array">
+      <obj_property name="ElementShortName">cmos_data_t[15:0]</obj_property>
+      <obj_property name="ObjectShortName">cmos_data_t[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/byte_flag" type="logic">
+      <obj_property name="ElementShortName">byte_flag</obj_property>
+      <obj_property name="ObjectShortName">byte_flag</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/byte_flag_d0" type="logic">
+      <obj_property name="ElementShortName">byte_flag_d0</obj_property>
+      <obj_property name="ObjectShortName">byte_flag_d0</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/frame_val_flag" type="logic">
+      <obj_property name="ElementShortName">frame_val_flag</obj_property>
+      <obj_property name="ObjectShortName">frame_val_flag</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/pos_vsync" type="logic">
+      <obj_property name="ElementShortName">pos_vsync</obj_property>
+      <obj_property name="ObjectShortName">pos_vsync</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_ov5640_lcd/u_ov5640_lcd/u_ov5640_dri/u_cmos_capture_data/WAIT_FRAME" type="array">
+      <obj_property name="ElementShortName">WAIT_FRAME[3:0]</obj_property>
+      <obj_property name="ObjectShortName">WAIT_FRAME[3:0]</obj_property>
+   </wvobject>
+</wave_config>

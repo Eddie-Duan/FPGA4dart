@@ -1,0 +1,36 @@
+# ============================================================
+#  Vivado 產生的檔案（可由 rtl/ sim/ prj/*.srcs/ 重新產生）
+# ============================================================
+prj/ov5640_lcd.gen/
+prj/ov5640_lcd.runs/
+prj/ov5640_lcd.hw/
+prj/ov5640_lcd.sim/
+prj/ov5640_lcd.cache/
+prj/ov5640_lcd.ip_user_files/
+prj/.Xil/
+
+# Vivado 執行記錄 / 產物
+*.jou
+*.log
+*.str
+*.pb
+*.dcp
+*.bit
+*.bin
+*.ltx
+*.xsa
+*.hwdef
+*.wdb
+*.wcfg.bak
+webtalk*
+
+# XSim
+xsim.dir/
+sim/xsim.dir/
+
+# 編輯器 / 作業系統
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+*~
