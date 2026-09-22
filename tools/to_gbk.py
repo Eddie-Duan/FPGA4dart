@@ -1,23 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-to_gbk.py  --  把新加入的視覺模組註解從 UTF-8 轉成 GBK
+to_gbk.py  --  把新加入的视觉模块注解从 UTF-8 转成 GBK
 
-為什麼：fpga4dart 專案內的 rtl/.xdc 都是 GBK 編碼（Vivado 在中文 Windows 下預設 ANSI），
-        新檔案若留在 UTF-8，Vivado 內建編輯器會顯示成亂碼。
+为什么：fpga4dart 专案内的 rtl/.xdc 都是 GBK 编码（Vivado 在中文 Windows 下默认 ANSI），
+        新文件若留在 UTF-8，Vivado 内建编辑器会显示成乱码。
 
 安全性：
-    - 已經是 GBK 的檔案自動跳過（避免二次編碼）
-    - 轉換後立刻用 GBK 讀回比對，不一致就報錯（不會留下壞檔）
-    - 內容若含 GBK 無法表示的符號（例如 ★ ✓ −）會轉換失敗並保留原檔
+    - 已经是 GBK 的文件自动跳过（避免二次编码）
+    - 转换后立刻用 GBK 读回比对，不一致就报错（不会留下坏档）
+    - 内容若含 GBK 无法表示的符号（例如 ★ ✓ −）会转换失败并保留原档
 
-用法（在專案根目錄）：
+用法（在专案根目录）：
     python tools/to_gbk.py
 """
 
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)          # 專案根目錄（fpga4dart）
+ROOT = os.path.dirname(HERE)          # 专案根目录（fpga4dart）
 
 FILES = [
     'rtl/armor_vision.v',
@@ -52,14 +52,14 @@ def main():
             data = fh.read()
 
         if not utf8_ok(data):
-            print('[skip] %s 已經不是 UTF-8（應該是 GBK）' % rel)
+            print('[skip] %s 已经不是 UTF-8（应该是 GBK）' % rel)
             continue
 
         text = data.decode('utf-8')
         try:
             out = text.encode('gbk')
         except UnicodeEncodeError as exc:
-            print('[FAIL] %s 有 GBK 無法表示的符號: %s' % (rel, exc))
+            print('[FAIL] %s 有 GBK 无法表示的符号: %s' % (rel, exc))
             continue
 
         with open(path, 'wb') as fh:
@@ -68,7 +68,7 @@ def main():
         with open(path, 'rb') as fh:
             back = fh.read().decode('gbk')
         if back != text:
-            raise SystemExit('**** %s 轉換後比對失敗，請從版本控制還原 ****' % rel)
+            raise SystemExit('**** %s 转换后比对失败，请从版本控制还原 ****' % rel)
 
         print('[ok]   %s  UTF-8 %d bytes -> GBK %d bytes' % (rel, len(data), len(out)))
 

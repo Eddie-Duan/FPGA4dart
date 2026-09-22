@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-check_project_paths.py  --  檢查 prj/*.xpr 裡引用的檔案是否都存在
+check_project_paths.py  --  检查 prj/*.xpr 里引用的文件是否都存在
 
-用途：把 Vivado 專案複製/搬移之後（只複製原始碼、不複製 .gen/.runs），
-      先確認 .xpr 引用的每個檔案都在，避免開 Vivado 才發現少檔。
+用途：把 Vivado 专案复制/搬移之后（只复制源代码、不复制 .gen/.runs），
+      先确认 .xpr 引用的每个文件都在，避免开 Vivado 才发现少档。
 
-用法（在專案根目錄）：
+用法（在专案根目录）：
     python tools/check_project_paths.py
 """
 
@@ -13,15 +13,15 @@ import os
 import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)                       # 專案根目錄
+ROOT = os.path.dirname(HERE)                       # 专案根目录
 XPR  = os.path.join(ROOT, 'prj', 'ov5640_lcd.xpr')
 
-# Vivado 專案內的變數 -> 實際目錄
+# Vivado 专案内的变数 -> 实际目录
 VARS = {
     '$PPRDIR':  os.path.join(ROOT, 'prj'),
     '$PSRCDIR': os.path.join(ROOT, 'prj', 'ov5640_lcd.srcs'),
-    '$PGENDIR': os.path.join(ROOT, 'prj', 'ov5640_lcd.gen'),      # 產生出來的，允許不存在
-    '$PCACHEDIR': os.path.join(ROOT, 'prj', 'ov5640_lcd.cache'),  # 產生出來的，允許不存在
+    '$PGENDIR': os.path.join(ROOT, 'prj', 'ov5640_lcd.gen'),      # 产生出来的，允许不存在
+    '$PCACHEDIR': os.path.join(ROOT, 'prj', 'ov5640_lcd.cache'),  # 产生出来的，允许不存在
     '$PRUNDIR': os.path.join(ROOT, 'prj', 'ov5640_lcd.runs'),     # 跑完才有
 }
 
@@ -37,7 +37,7 @@ def main():
 
     refs = re.findall(r'<File Path="([^"]+)"', text)
     print('xpr     : %s' % XPR)
-    print('引用檔案: %d 個' % len(refs))
+    print('引用文件: %d 个' % len(refs))
 
     missing = []
     for ref in refs:
@@ -51,20 +51,20 @@ def main():
             missing.append((ref, any(ref.startswith(g) for g in GENERATED)))
 
     if not missing:
-        print('[OK] 所有引用的檔案都存在')
+        print('[OK] 所有引用的文件都存在')
         return
 
     hard = [m for m in missing if not m[1]]
     soft = [m for m in missing if m[1]]
 
     for ref, _ in soft:
-        print('[gen ] 尚未產生（開 Vivado 後會自動重建）: %s' % ref)
+        print('[gen ] 尚未产生（开 Vivado 后会自动重建）: %s' % ref)
     for ref, _ in hard:
         print('[MISS] 缺少: %s' % ref)
 
     if hard:
-        raise SystemExit('有 %d 個必要檔案缺失' % len(hard))
-    print('[OK] 原始碼檔案齊全（僅缺少可重建的產生檔）')
+        raise SystemExit('有 %d 个必要文件缺失' % len(hard))
+    print('[OK] 源代码文件齐全（仅缺少可重建的产生档）')
 
 
 if __name__ == '__main__':

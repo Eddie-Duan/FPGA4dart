@@ -79,7 +79,7 @@ wire  [12:0] total_h_pixel             ;  //水平总像素大小
 wire  [12:0] total_v_pixel             ;  //垂直总像素大小
 wire         rd_vsync                 ;  //帧起始脉冲(LCD场信号)
 wire  [15:0] lcd_data                 ;  //视觉处理后送LCD的像素
-wire         vision_bond_valid        ;  //侦测到装甲板
+wire         vision_bond_valid        ;  //检测到装甲板
 wire  [9:0]  vision_cx                ;  //装甲板中心x
 wire  [9:0]  vision_cy                ;  //装甲板中心y
 
@@ -232,7 +232,7 @@ armor_vision u_armor_vision(
     .key        (key              ),//按键
     .data_out   (lcd_data         ),//处理后像素
     .led        (led              ),//LED指示
-    .bond_valid (vision_bond_valid),//侦测结果
+    .bond_valid (vision_bond_valid),//检测结果
     .center_x   (vision_cx        ),
     .center_y   (vision_cy        )
 );

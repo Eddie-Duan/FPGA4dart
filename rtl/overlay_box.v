@@ -1,34 +1,34 @@
 //****************************************Copyright (c)***********************************//
 // File name:           overlay_box
-// Descriptions:        在像素串流上疊加「邊界框 + 中心十字」（純組合邏輯）
+// Descriptions:        在像素串流上叠加“边界框 + 中心十字”（纯组合逻辑）
 //
-//   座標系與二值圖相同（同一個像素串流），所以框一定貼著看到的那兩根燈條。
-//   THICK 為線寬（像素）。
+//   坐标系与二值图相同（同一个像素串流），所以框一定贴著看到的那两根灯条。
+//   THICK 为线宽（像素）。
 //----------------------------------------------------------------------------------------
 //****************************************************************************************//
 `timescale 1ns / 1ps
 
 module overlay_box #(
-    parameter AW    = 10,   // 座標位寬
-    parameter THICK = 3     // 線寬
+    parameter AW    = 10,   // 坐标位宽
+    parameter THICK = 3     // 线宽
 )(
-    input                valid ,   // 邊界框有效
-    input      [AW-1:0]  x     ,   // 當前像素 x
-    input      [AW-1:0]  y     ,   // 當前像素 y
+    input                valid ,   // 边界框有效
+    input      [AW-1:0]  x     ,   // 当前像素 x
+    input      [AW-1:0]  y     ,   // 当前像素 y
     input      [AW-1:0]  bl    ,   // 框左
     input      [AW-1:0]  br    ,   // 框右
     input      [AW-1:0]  bt    ,   // 框上
     input      [AW-1:0]  bb    ,   // 框下
     input      [AW-1:0]  cx    ,   // 中心 x
     input      [AW-1:0]  cy    ,   // 中心 y
-    output               draw      // 1 = 此像素要畫框/十字
+    output               draw      // 1 = 此像素要画框/十字
 );
 
 //wire define
 wire in_x = (x >= bl) && (x <= br);
 wire in_y = (y >= bt) && (y <= bb);
 
-// 四條邊
+// 四条边
 wire on_h = in_x && ((y < (bt + THICK)) || (y > (bb - THICK)));
 wire on_v = in_y && ((x < (bl + THICK)) || (x > (br - THICK)));
 

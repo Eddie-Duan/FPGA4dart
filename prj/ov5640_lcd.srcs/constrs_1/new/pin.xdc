@@ -62,8 +62,8 @@ set_property -dict {PACKAGE_PIN B16 IOSTANDARD LVCMOS33} [get_ports cam_sda]
 #---------------------- 按键 key[3:0] ---------------------
 # 低电平有效（按下 = 0）
 #   key[0] : 红 / 蓝 切换
-#   key[1] : 颜色门槛 +8
-#   key[2] : 颜色门槛 -8
+#   key[1] : 颜色阈值 +8
+#   key[2] : 颜色阈值 -8
 #   key[3] : 显示模式切换
 set_property -dict {PACKAGE_PIN T1 IOSTANDARD LVCMOS33} [get_ports {key[0]}]
 set_property -dict {PACKAGE_PIN U1 IOSTANDARD LVCMOS33} [get_ports {key[1]}]
@@ -73,7 +73,7 @@ set_property -dict {PACKAGE_PIN T3 IOSTANDARD LVCMOS33} [get_ports {key[3]}]
 #---------------------- LED led[3:0] ----------------------
 # 低电平点亮
 #   led[0] : 红色模式    led[1] : 蓝色模式
-#   led[2] : 侦测到装甲板 led[3] : 心跳
+#   led[2] : 检测到装甲板 led[3] : 心跳
 set_property -dict {PACKAGE_PIN R2 IOSTANDARD LVCMOS33} [get_ports {led[0]}]
 set_property -dict {PACKAGE_PIN R3 IOSTANDARD LVCMOS33} [get_ports {led[1]}]
 set_property -dict {PACKAGE_PIN V2 IOSTANDARD LVCMOS33} [get_ports {led[2]}]

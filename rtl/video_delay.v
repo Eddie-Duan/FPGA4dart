@@ -1,37 +1,37 @@
 //****************************************Copyright (c)***********************************//
 // File name:           video_delay
-// Descriptions:        像素串流延遲器（延遲 LINES 行 + PIXELS 像素）
+// Descriptions:        像素串流延迟器（延迟 LINES 行 + PIXELS 像素）
 //
-//   用途：形態學兩級（膨脹+腐蝕）的窗口是「右下角對齊」，
-//         所以二值圖在螢幕上會整體往右下偏移 N-1（N 為窗口大小）。
-//         把原圖也延遲同樣的行數與像素數，原圖與標記就會對齊。
+//   用途：形态学两级（膨胀+腐蚀）的窗口是“右下角对齐”，
+//         所以二值图在屏幕上会整体往右下偏移 N-1（N 为窗口大小）。
+//         把原图也延迟同样的行数与像素数，原图与标记就会对齐。
 //
-//   行緩衝用 line_buffer（分散式 RAM 標準模板）級聯而成，
-//   讀寫位址都是當前列，讀取看到舊值 = 延遲一整行。
-//   PIXELS 用一般移位暫存器（行首清 0，避免跨行殘留）。
+//   行缓冲用 line_buffer（分散式 RAM 标准模板）级联而成，
+//   读写地址都是当前列，读取看到旧值 = 延迟一整行。
+//   PIXELS 用一般移位寄存器（行首清 0，避免跨行残留）。
 //----------------------------------------------------------------------------------------
 //****************************************************************************************//
 `timescale 1ns / 1ps
 
 module video_delay #(
-    parameter DW     = 16  ,   // 資料位寬
-    parameter WIDTH  = 800 ,   // 一行像素數
-    parameter LINES  = 8   ,   // 延遲行數
-    parameter PIXELS = 8   ,   // 延遲像素數
-    parameter AW     = 10      // x 位寬
+    parameter DW     = 16  ,   // 数据位宽
+    parameter WIDTH  = 800 ,   // 一行像素数
+    parameter LINES  = 8   ,   // 延迟行数
+    parameter PIXELS = 8   ,   // 延迟像素数
+    parameter AW     = 10      // x 位宽
 )(
-    input                clk   ,  // 時鐘
-    input                rst_n ,  // 復位
+    input                clk   ,  // 时钟
+    input                rst_n ,  // 复位
     input                de    ,  // 像素有效
-    input      [AW-1:0]  x     ,  // 當前像素 x
-    input      [DW-1:0]  din   ,  // 輸入像素
-    output     [DW-1:0]  dout     // 延遲後像素（與 din 同拍輸出）
+    input      [AW-1:0]  x     ,  // 当前像素 x
+    input      [DW-1:0]  din   ,  // 输入像素
+    output     [DW-1:0]  dout     // 延迟后像素（与 din 同拍输出）
 );
 
 //wire define
-wire [LINES*DW-1:0] lb_out ;   // 各行緩衝輸出
-wire [LINES*DW-1:0] lb_din ;   // 各行緩衝輸入（級聯）
-wire [DW-1:0]       vert_d ;   // 延遲 LINES 行後的像素
+wire [LINES*DW-1:0] lb_out ;   // 各行缓冲输出
+wire [LINES*DW-1:0] lb_din ;   // 各行缓冲输入（级联）
+wire [DW-1:0]       vert_d ;   // 延迟 LINES 行后的像素
 
 //reg define
 reg  [DW-1:0] sr [0:PIXELS-1];   // 水平移位
@@ -43,7 +43,7 @@ genvar  i;
 //*****************************************************
 
 //-------------------------------------------------------
-// 行緩衝級聯：第 0 條吃 din，第 k 條吃第 k-1 條的輸出
+// 行缓冲级联：第 0 条吃 din，第 k 条吃第 k-1 条的输出
 //-------------------------------------------------------
 assign lb_din = {lb_out[(LINES-1)*DW-1:0], din};
 
