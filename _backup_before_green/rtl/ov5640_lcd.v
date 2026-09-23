@@ -19,8 +19,6 @@
 module ov5640_lcd(    
     input      [3:0]      key          ,  //按键(低电平有效)
     output     [3:0]      led          ,  //LED指示(低电平点亮)
-    output     [5:0]      seg_sel      ,  //数码管位选(低电平选通)
-    output     [7:0]      seg_led      ,  //数码管段码(低电平点亮)
     input                 sys_clk      ,  //系统时钟
     input                 sys_rst_n    ,  //系统复位，低电平有效
     //摄像头接口                       
@@ -221,7 +219,7 @@ lcd_rgb_top  u_lcd_rgb_top(
 
 
 //*****************************************************
-//**  视觉管线：绿色分割 -> 形态学 -> 双投影找绿块 -> 红色圆环/十字 + 数码管
+//**  视觉处理：颜色分割 -> 形态学 -> 投影 -> 画框/十字
 //**  说明文件：README.md / doc/vision_pipeline.md
 //*****************************************************
 
@@ -234,8 +232,6 @@ armor_vision u_armor_vision(
     .key        (key              ),//按键
     .data_out   (lcd_data         ),//处理后像素
     .led        (led              ),//LED指示
-    .seg_sel    (seg_sel          ),//数码管位选
-    .seg_led    (seg_led          ),//数码管段码
     .bond_valid (vision_bond_valid),//检测结果
     .center_x   (vision_cx        ),
     .center_y   (vision_cy        )

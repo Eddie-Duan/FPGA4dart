@@ -30,6 +30,7 @@ read_verilog [list \
     $rtl/video_delay.v \
     $rtl/proj_bond.v \
     $rtl/overlay_box.v \
+    $rtl/seg_display.v \
     $rtl/vision_cfg.v \
     $rtl/armor_vision.v ]
 

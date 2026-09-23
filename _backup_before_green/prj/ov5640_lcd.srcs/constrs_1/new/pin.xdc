@@ -61,10 +61,10 @@ set_property -dict {PACKAGE_PIN B16 IOSTANDARD LVCMOS33} [get_ports cam_sda]
 
 #---------------------- 按键 key[3:0] ---------------------
 # 低电平有效（按下 = 0）
-#   key[0] : 循环选择要调的阈值（TH_G / TH_G-R / TH_G-B）
-#   key[1] : 当前选中的阈值 +8
-#   key[2] : 当前选中的阈值 -8
-#   key[3] : 显示模式切换（原图变暗+标记 / 纯二值）
+#   key[0] : 红 / 蓝 切换
+#   key[1] : 颜色阈值 +8
+#   key[2] : 颜色阈值 -8
+#   key[3] : 显示模式切换
 set_property -dict {PACKAGE_PIN T1 IOSTANDARD LVCMOS33} [get_ports {key[0]}]
 set_property -dict {PACKAGE_PIN U1 IOSTANDARD LVCMOS33} [get_ports {key[1]}]
 set_property -dict {PACKAGE_PIN W2 IOSTANDARD LVCMOS33} [get_ports {key[2]}]
@@ -72,27 +72,9 @@ set_property -dict {PACKAGE_PIN T3 IOSTANDARD LVCMOS33} [get_ports {key[3]}]
 
 #---------------------- LED led[3:0] ----------------------
 # 低电平点亮
-#   led[0] : 选中 TH_G       led[1] : 选中 TH_G-R
-#   led[2] : 选中 TH_G-B     led[3] : 检测到目标(常亮)/未检测到(1.5Hz闪)
+#   led[0] : 红色模式    led[1] : 蓝色模式
+#   led[2] : 检测到装甲板 led[3] : 心跳
 set_property -dict {PACKAGE_PIN R2 IOSTANDARD LVCMOS33} [get_ports {led[0]}]
 set_property -dict {PACKAGE_PIN R3 IOSTANDARD LVCMOS33} [get_ports {led[1]}]
 set_property -dict {PACKAGE_PIN V2 IOSTANDARD LVCMOS33} [get_ports {led[2]}]
 set_property -dict {PACKAGE_PIN Y2 IOSTANDARD LVCMOS33} [get_ports {led[3]}]
-
-#---------------------- 数码管 seg_sel[5:0] / seg_led[7:0] ----------------------
-# 板载 6 位共阳数码管：位选低电平选通，段码低电平点亮
-#   seg_led[7:0] = {dp,g,f,e,d,c,b,a}
-set_property -dict {PACKAGE_PIN J15 IOSTANDARD LVCMOS33} [get_ports {seg_sel[0]}]
-set_property -dict {PACKAGE_PIN H17 IOSTANDARD LVCMOS33} [get_ports {seg_sel[1]}]
-set_property -dict {PACKAGE_PIN H13 IOSTANDARD LVCMOS33} [get_ports {seg_sel[2]}]
-set_property -dict {PACKAGE_PIN G17 IOSTANDARD LVCMOS33} [get_ports {seg_sel[3]}]
-set_property -dict {PACKAGE_PIN H18 IOSTANDARD LVCMOS33} [get_ports {seg_sel[4]}]
-set_property -dict {PACKAGE_PIN G18 IOSTANDARD LVCMOS33} [get_ports {seg_sel[5]}]
-set_property -dict {PACKAGE_PIN H15 IOSTANDARD LVCMOS33} [get_ports {seg_led[0]}]
-set_property -dict {PACKAGE_PIN G16 IOSTANDARD LVCMOS33} [get_ports {seg_led[1]}]
-set_property -dict {PACKAGE_PIN L13 IOSTANDARD LVCMOS33} [get_ports {seg_led[2]}]
-set_property -dict {PACKAGE_PIN G15 IOSTANDARD LVCMOS33} [get_ports {seg_led[3]}]
-set_property -dict {PACKAGE_PIN K13 IOSTANDARD LVCMOS33} [get_ports {seg_led[4]}]
-set_property -dict {PACKAGE_PIN G13 IOSTANDARD LVCMOS33} [get_ports {seg_led[5]}]
-set_property -dict {PACKAGE_PIN H14 IOSTANDARD LVCMOS33} [get_ports {seg_led[6]}]
-set_property -dict {PACKAGE_PIN J14 IOSTANDARD LVCMOS33} [get_ports {seg_led[7]}]
