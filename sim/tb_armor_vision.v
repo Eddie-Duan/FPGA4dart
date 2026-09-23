@@ -6,24 +6,15 @@
 //     - 背景：灰 0x8410
 //     - 靶标：一个【绿色实心圆】，圆心 (400,240)、半径 100（原图坐标）
 //             绿 = 0x750E -> r8=118  g8=162  b8=118
-//             所以 G-R = 44、G-B = 44，正好可以用来验证 TH_G-R 阈值有没有生效
+//             所以 G-R = G-B = 44，正好可以用来验证 TH_G-R 阈值有没有生效
+//     - 相位 2 会盖一条【白色眩光带】(py 225..255) 横穿圆心，模拟 LCD 镜面反光
 //     - rddata 与 rdata_req 打一拍（与 ddr3_fifo_ctrl 一致）
 //
-//   检查项：
-//     相位 1  默认阈值：出框、圆心、边界框、以及 4 个采样点的像素
-//             （圆内=原色、背景=变暗、圆环=红、圆心=红）
-//     相位 2  key[0] 一次 -> 选中项切到 TH_G-R
-//     相位 3  key[1] 两次 -> TH_G-R 32->48 > 44 -> 目标丢失（bond_valid=0）
-//     相位 4  key[2] 两次 -> TH_G-R 回到 32 -> 恢复检测
-//     相位 5  key[0] 一次 -> 选中项切到 TH_G-B
-//     相位 6  key[3] 一次 -> 纯二值显示模式（圆内显示白色）
-//
-//   期望值的推导：
-//     形态学窗口「右下角对齐」，膨胀+腐蚀后二值图整体往右下偏 8 像素，
-//     所以二值图上的圆心是 (400+8, 240+8) = (408, 248)、半径仍是 100。
-//     投影阈值 TH_MIN=24：一列的弦长 2*sqrt(100^2-d^2) >= 24 要求 |d| <= 99，
-//     所以左右 = 408±99 = [309,507]、上下 = 248±99 = [149,347]（宽高都是 199）。
-//     圆环半径 = (199+199)/4 = 99，环宽 ±2 -> 采样点取 (507,248)（dx=99，落在环上）。
+//   期望值的推导见 doc/vision_pipeline.md：
+//     形态学「右下角对齐」-> 二值图整体右下偏 8 -> 圆心 (408,248)、半径仍 100
+//     投影阈值 TH_MIN=4：一列弦长 >= 4 要求 |d| <= 99 -> bl/br = 309/507、bt/bb = 149/347
+//     圆环半径 = (199+199)/4 = 99（环带 97..101）
+//     瞄准点 = 圆心往上 宽度*64/256 = 199/4 = 49 -> (408, 199)
 //----------------------------------------------------------------------------------------
 //****************************************************************************************//
 
@@ -45,14 +36,15 @@ localparam V_DISP  = 480 ;
 localparam CLK_P   = 40;     // 25MHz
 
 //-------------------------------------------------------
-// 合成图像：一个绿色实心圆
+// 合成图像：一个绿色实心圆 + 可选白色眩光带
 //-------------------------------------------------------
 localparam CX_IMG = 400;
 localparam CY_IMG = 240;
-localparam RD2    = 10000;   // 100^2
+localparam GLARE_T = 225;    // 眩光带上下沿（py）
+localparam GLARE_B = 255;
 
 //-------------------------------------------------------
-// 期望值
+// 期望值（无眩光）
 //-------------------------------------------------------
 localparam EXP_L  = 10'd309;
 localparam EXP_R  = 10'd507;
@@ -61,6 +53,15 @@ localparam EXP_B  = 10'd347;
 localparam EXP_CX = 10'd408;
 localparam EXP_CY = 10'd248;
 localparam EXP_W  = 11'd199;
+localparam EXP_AY = 10'd199;   // 瞄准点 y
+
+//-------------------------------------------------------
+// 期望值（有眩光带时）—— 只有宽度会缩 1 像素，高度和圆心必须不变
+//   （旧版「取最长 run」在这里会退化成 h≈84、center_y≈190，就是「识别不到」的现场）
+//-------------------------------------------------------
+localparam GLA_L  = 10'd310;
+localparam GLA_R  = 10'd506;
+localparam GLA_W  = 11'd197;
 
 //-------------------------------------------------------
 // 颜色
@@ -70,6 +71,7 @@ localparam GRAY_PIX  = 16'h8410;   // 背景灰
 localparam DIM_PIX   = 16'h4208;   // 背景灰变暗后的值
 localparam MARK_PIX  = 16'hF800;   // 标记红
 localparam BIN_W     = 16'hFFFF;   // 纯二值模式：命中 = 白
+localparam GLARE_PIX = 16'hFFFF;   // 眩光带白
 
 //reg define
 reg         clk   = 1'b0;
@@ -77,6 +79,7 @@ reg         rst_n = 1'b0;
 reg  [10:0] h_cnt = 11'd0;
 reg  [10:0] v_cnt = 11'd0;
 reg  [3:0]  key   = 4'b1111;      // 全部松开
+reg         glare_on = 1'b0;      // 1 = 打开眩光带
 reg  [15:0] data_in;
 
 //wire define
@@ -92,9 +95,10 @@ wire [5:0]  seg_sel;
 wire [7:0]  seg_led;
 wire        bond_valid;
 wire [9:0]  center_x, center_y;
+wire [9:0]  aim_x, aim_y;
 
 reg [31:0] frame_cnt = 32'd0;
-reg [15:0] cap_in, cap_bg, cap_ring, cap_ctr;
+reg [15:0] cap_in, cap_bg, cap_ring, cap_cctr, cap_aim;
 reg [31:0] err_cnt = 32'd0;
 
 // 做差要显式带符号，否则 px<400 时会变成无符号大数
@@ -133,30 +137,35 @@ always @(posedge clk) begin
 end
 
 //-------------------------------------------------------
-// 合成测试图像
+// 合成测试图像：绿圆，相位 2 再盖一条白色眩光带
 //-------------------------------------------------------
 always @(*) begin
     data_in = GRAY_PIX;
     if((px <= 11'd799) && (py >= 11'd1) && (py <= 11'd480) && in_circle)
         data_in = GREEN_PIX;
+    // 眩光：横贯整幅画面的白色带（颜色分割判不出绿 -> 在灯上打一个洞）
+    if(glare_on && (py >= GLARE_T) && (py <= GLARE_B))
+        data_in = GLARE_PIX;
 end
 
 //-------------------------------------------------------
 // 被测模块
 //-------------------------------------------------------
 armor_vision #(
-    .IMG_W     (800        ),
-    .IMG_H     (480        ),
-    .AW        (10         ),
-    .MORPH_N   (9          ),
-    .CLK_FREQ  (25_000_000 ),
-    .TH_G_DEF  (8'd100     ),
-    .TH_GR_DEF (8'd32      ),
-    .TH_GB_DEF (8'd32      ),
-    .TH_MIN    (24         ),
-    .MIN_SIZE  (24         ),
-    .RING_T    (2          ),
-    .CROSS_L   (12         )
+    .IMG_W       (800        ),
+    .IMG_H       (480        ),
+    .AW          (10         ),
+    .MORPH_N     (9          ),
+    .CLK_FREQ    (25_000_000 ),
+    .TH_G_DEF    (8'd100     ),
+    .TH_GR_DEF   (8'd32      ),
+    .TH_GB_DEF   (8'd32      ),
+    .REL_SAT_PCT (8'd20      ),
+    .TH_MIN      (4          ),
+    .MIN_SIZE    (24         ),
+    .AIM_H_Q8    (8'd64      ),
+    .RING_T      (2          ),
+    .CROSS_L     (12         )
 ) u_armor_vision (
     .clk        (clk        ),
     .rst_n      (rst_n      ),
@@ -170,26 +179,31 @@ armor_vision #(
     .seg_led    (seg_led    ),
     .bond_valid (bond_valid ),
     .center_x   (center_x   ),
-    .center_y   (center_y   )
+    .center_y   (center_y   ),
+    .aim_x      (aim_x      ),
+    .aim_y      (aim_y      )
 );
 
 //-------------------------------------------------------
-// 抓取四个采样点（用模块内部的像素坐标对齐，最稳）
+// 抓取样点（用模块内部的像素坐标对齐，最稳）
 //-------------------------------------------------------
 always @(posedge clk) begin
     if(rst_n && u_armor_vision.de_v && (frame_cnt >= 32'd4)) begin
-        // 圆内（离圆心 58 像素，不在环/十字上）
+        // 圆内、不在环/十字上（注意：眩光带会盖住这一行）
         if((u_armor_vision.x_v == 10'd350) && (u_armor_vision.y_cnt == 10'd248))
             cap_in   <= data_out;
         // 远处背景
         if((u_armor_vision.x_v == 10'd100) && (u_armor_vision.y_cnt == 10'd400))
             cap_bg   <= data_out;
-        // 圆环上（dx = 99，正好落在 [97,101] 环带内）
+        // 圆环上（dx = 99，落在 97..101 环带内）
         if((u_armor_vision.x_v == 10'd507) && (u_armor_vision.y_cnt == 10'd248))
             cap_ring <= data_out;
-        // 圆心
+        // 圆心（现在这里不再画十字，应该显示原色）
         if((u_armor_vision.x_v == 10'd408) && (u_armor_vision.y_cnt == 10'd248))
-            cap_ctr  <= data_out;
+            cap_cctr <= data_out;
+        // 瞄准点（py=199，不在眩光带内）
+        if((u_armor_vision.x_v == 10'd408) && (u_armor_vision.y_cnt == 10'd199))
+            cap_aim  <= data_out;
     end
 end
 
@@ -249,7 +263,7 @@ initial begin
     wait_frames(6);
 
     //=====================================================
-    $display("---- phase 1 : default TH_G=100 TH_GR=32 TH_GB=32 ----");
+    $display("---- phase 1 : clean image, default thresholds ----");
     //=====================================================
     chk("bond_valid", bond_valid           , 32'd1   );
     chk("bond_l",     u_armor_vision.bl    , EXP_L   );
@@ -259,23 +273,48 @@ initial begin
     chk("bond_w",     u_armor_vision.bond_w, EXP_W   );
     chk("center_x",   center_x             , EXP_CX  );
     chk("center_y",   center_y             , EXP_CY  );
+    chk("aim_x",      aim_x                , EXP_CX  );
+    chk("aim_y",      aim_y                , EXP_AY  );
     chk("th_g",       u_armor_vision.th_g  , 32'd100 );
     chk("th_gr",      u_armor_vision.th_gr , 32'd32  );
     chk("th_gb",      u_armor_vision.th_gb , 32'd32  );
     chk("sel",        u_armor_vision.sel   , 32'd0   );
 
     $display("---- phase 1 : pixel checks ----");
-    chk("inside_green", cap_in , GREEN_PIX );
-    chk("bg_dim",       cap_bg , DIM_PIX   );
-    chk("ring_red",     cap_ring, MARK_PIX );
-    chk("center_red",   cap_ctr , MARK_PIX );
+    chk("inside_green", cap_in , GREEN_PIX );   // 圆内保持原色
+    chk("bg_dim",       cap_bg , DIM_PIX   );   // 圆外变暗
+    chk("ring_red",     cap_ring, MARK_PIX );   // 圆环
+    chk("cctr_green",   cap_cctr, GREEN_PIX);   // 圆心不画十字了
+    chk("aim_red",      cap_aim , MARK_PIX );   // 瞄准点十字
 
     $display("---- phase 1 : misc ----");
-    chk("led3_on", {31'b0,led[3]}, 32'd0);     // 检测到时 led[3] 常亮
+    chk("led3_detected", {31'b0,led[3]} , 32'd0 );   // 低电平点亮
     chk("seg_sel_act", (seg_sel != 6'b111111), 32'd1);
 
     //=====================================================
-    $display("---- phase 2 : key[0] x1 -> select TH_G-R ----");
+    $display("---- phase 2 : GLARE band across the lamp (py 225..255) ----");
+    $display("     old run-based projection collapsed here (h~84, cy~190)");
+    //=====================================================
+    glare_on = 1'b1;
+    wait_frames(4);
+    chk("bond_valid", bond_valid           , 32'd1   );
+    chk("bond_l",     u_armor_vision.bl    , GLA_L   );
+    chk("bond_r",     u_armor_vision.br    , GLA_R   );
+    chk("bond_w",     u_armor_vision.bond_w, GLA_W   );
+    chk("bond_t",     u_armor_vision.bt    , EXP_T   );
+    chk("bond_b",     u_armor_vision.bb    , EXP_B   );
+    chk("center_y",   center_y             , EXP_CY  );
+    chk("aim_y",      aim_y                , EXP_AY  );
+
+    glare_on = 1'b0;
+    wait_frames(4);
+    $display("---- phase 2 : glare removed, must recover ----");
+    chk("bond_l",       u_armor_vision.bl, EXP_L   );
+    chk("inside_green", cap_in           , GREEN_PIX);
+    chk("ring_red",     cap_ring         , MARK_PIX );
+
+    //=====================================================
+    $display("---- phase 3 : key[0] x1 -> select TH_G-R ----");
     //=====================================================
     press_key(3'd0);
     wait_frames(4);
@@ -283,7 +322,7 @@ initial begin
     chk("bond_valid", bond_valid        , 32'd1 );
 
     //=====================================================
-    $display("---- phase 3 : key[1] x2 -> TH_GR=48 > G-R(44) -> lost ----");
+    $display("---- phase 4 : key[1] x2 -> TH_GR=48 > G-R(44) -> lost ----");
     //=====================================================
     press_key(3'd1);
     press_key(3'd1);
@@ -293,7 +332,7 @@ initial begin
     chk("led3_blink", {31'b0,led[3]}, {31'b0,~u_armor_vision.hb});
 
     //=====================================================
-    $display("---- phase 4 : key[2] x2 -> TH_GR back to 32 -> found ----");
+    $display("---- phase 5 : key[2] x2 -> TH_GR back to 32 -> found ----");
     //=====================================================
     press_key(3'd2);
     press_key(3'd2);
@@ -301,16 +340,17 @@ initial begin
     chk("th_gr",      u_armor_vision.th_gr, 32'd32);
     chk("bond_valid", bond_valid          , 32'd1 );
     chk("center_x",   center_x            , EXP_CX);
+    chk("aim_y",      aim_y               , EXP_AY);
 
     //=====================================================
-    $display("---- phase 5 : key[0] x1 -> select TH_G-B ----");
+    $display("---- phase 6 : key[0] x1 -> select TH_G-B ----");
     //=====================================================
     press_key(3'd0);
     wait_frames(4);
     chk("sel", u_armor_vision.sel, 32'd2);
 
     //=====================================================
-    $display("---- phase 6 : key[3] x1 -> binary display mode ----");
+    $display("---- phase 7 : key[3] x1 -> binary display mode ----");
     //=====================================================
     press_key(3'd3);
     wait_frames(4);

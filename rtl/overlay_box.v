@@ -1,10 +1,11 @@
 //****************************************Copyright (c)***********************************//
 // File name:           overlay_box
-// Descriptions:        在像素流上叠印【红色圆环 + 中心十字】（纯组合逻辑）
+// Descriptions:        在像素流上叠印【红色圆环 + 瞄准点十字】（纯组合逻辑）
 //
-//   靶标是一个绿色圆，所以标记画成：
-//     - 圆环：半径 R = (宽 + 高) / 4，环宽 ±RING_T 像素
-//     - 十字：中心处一横一竖，臂长 CROSS_L、线宽 ±CROSS_T
+//   - 圆环：套住识别到的绿色圆灯（让肉眼确认「有没有认到、认到多大」）
+//           半径 R = (宽 + 高) / 4，环宽 ±RING_T 像素
+//   - 十字：画在【瞄准点】上（proj_bond 算出来的 aim_x / aim_y）
+//           瞄准点在灯心上方一点，所以正常情况下十字会在圆环圆心上方浮动
 //
 //   圆环判据不用开根号（省 DSP / 时序）：
 //        dx = x - cx ,  dy = y - cy
@@ -32,8 +33,10 @@ module overlay_box #(
     input      [AW-1:0]  br    ,   // 右
     input      [AW-1:0]  bt    ,   // 上
     input      [AW-1:0]  bb    ,   // 下
-    input      [AW-1:0]  cx    ,   // 圆心 x
-    input      [AW-1:0]  cy    ,   // 圆心 y
+    input      [AW-1:0]  cx    ,   // 圆心 x（圆环中心）
+    input      [AW-1:0]  cy    ,   // 圆心 y（圆环中心）
+    input      [AW-1:0]  ax    ,   // 瞄准点 x（十字中心）
+    input      [AW-1:0]  ay    ,   // 瞄准点 y（十字中心）
     output               draw      // 1 = 这个像素要画标记
 );
 
@@ -51,19 +54,21 @@ wire [AW:0]  r_ou = rr + RING_T;
 wire [DW2-1:0] in2  = r_in * r_in;
 wire [DW2-1:0] out2 = r_ou * r_ou;
 
-// 像素相对圆心的带符号偏移
+// 像素相对【圆心】的带符号偏移（圆环用）
 wire signed [AW:0] dx = $signed({1'b0,x}) - $signed({1'b0,cx});
 wire signed [AW:0] dy = $signed({1'b0,y}) - $signed({1'b0,cy});
 wire [DW2-1:0]     d2 = dx*dx + dy*dy;
 
 wire on_ring = (d2 >= in2) && (d2 <= out2);
 
-// 十字（用绝对值比较，不用开根号）
-wire [AW:0] adx = dx[AW] ? (~dx + 1'b1) : dx;
-wire [AW:0] ady = dy[AW] ? (~dy + 1'b1) : dy;
+// 像素相对【瞄准点】的带符号偏移（十字用，用绝对值比较，不用开根号）
+wire signed [AW:0] ax_d = $signed({1'b0,x}) - $signed({1'b0,ax});
+wire signed [AW:0] ay_d = $signed({1'b0,y}) - $signed({1'b0,ay});
+wire [AW:0] aadx = ax_d[AW] ? (~ax_d + 1'b1) : ax_d;
+wire [AW:0] aady = ay_d[AW] ? (~ay_d + 1'b1) : ay_d;
 
-wire on_h = (ady <= CROSS_T) && (adx <= CROSS_L);   // 横臂
-wire on_v = (adx <= CROSS_T) && (ady <= CROSS_L);   // 竖臂
+wire on_h = (aady <= CROSS_T) && (aadx <= CROSS_L);   // 横臂
+wire on_v = (aadx <= CROSS_T) && (aady <= CROSS_L);   // 竖臂
 
 //*****************************************************
 //**                    main code

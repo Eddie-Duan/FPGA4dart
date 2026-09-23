@@ -1,18 +1,31 @@
 //****************************************Copyright (c)***********************************//
 // File name:           armor_vision
-// Descriptions:        视觉管线顶层（绿色圆形靶标识别 + 红色圆环 / 十字标记）
+// Descriptions:        视觉管线顶层（绿色圆形靶标识别 + 红色圆环 / 瞄准点十字）
 //
 //   飞镖（dart）的靶标是【一个大绿色圆形灯】。本管线把 DDR3 读出的 RGB565 像素流
 //   （rddata / rdata_req / rd_vsync）处理一遍，再送给 lcd_rgb_top 显示。
 //
 //   管线：
-//     (1) 绿色分割         green 判据：G >= TH_G 且 G-R >= TH_GR 且 G-B >= TH_GB   color_seg
-//     (2) 形态学闭运算     9x9 膨胀 -> 9x9 腐蚀（填小洞、去碎点）                  morph_nxn x2
-//     (3) 原图延迟         延后 8 行 + 8 像素，抵消形态学窗口的空间偏移            video_delay
-//     (4) 双投影找绿块     X / Y 两个直方图 -> 最宽列 run / 最长行 run -> 边界框    proj_bond
-//     (5) 叠印标记         红色圆环 + 中心十字                                     overlay_box
-//     (6) 数码管           显示三个阈值 / 目标尺寸                                 seg_display
-//     (7) 显示合成         原图变暗 + 命中处原色（或纯二值）+ 红色标记
+//     (1) 绿色分割         绝对判据 + 相对饱和度闸（抗反光）              color_seg
+//     (2) 形态学闭运算      9x9 膨胀 -> 9x9 腐蚀（填小洞、去碎点）         morph_nxn x2
+//     (3) 原图延迟          延后 8 行 + 8 像素，抵消形态学窗口的空间偏移   video_delay
+//     (4) 双投影找绿块      X/Y 直方图取【外沿】-> 边界框 / 圆心 / 瞄准点  proj_bond
+//     (5) 叠印标记          红色圆环 + 瞄准点十字                         overlay_box
+//     (6) 数码管            显示三个阈值 / 目标尺寸                       seg_display
+//     (7) 显示合成          原图变暗 + 命中处原色（或纯二值）+ 红色标记
+//
+//   【抗反光】**默认靠算法**（两条尺度无关的措施，不依赖任何相机设置）：
+//     a) 算法端（主力）：color_seg 的相对饱和度闸 —— 对自动曝光 / 自动白平衡的漂移天然免疫
+//     b) 算法端：proj_bond 的「取外沿」投影 —— 不会被反射在灯上打出的洞切成两半
+//     c) 相机端（**可选，默认关闭**）：i2c_ov5640_rgb565_cfg.v 的 CAM_LOCK_EN
+//        打开后把曝光 / 增益锁死（dart 工程就是固定曝光 + 固定增益）。
+//        注意：固定曝光值必须按现场亮度标定，标错会「黑屏」——
+//        因为 lcd_driver.v 里 lcd_bl 写死 1'b1（背光常亮），「黑」只能是像素数据本身黑。
+//
+//   【瞄准点】靶标的实际打击点在绿色灯上方一点，所以 proj_bond 会把圆心往上偏移
+//     AIM_H_Q8/256 × 宽度 个像素（默认 1/4）。这个偏移**不需要知道距离**：
+//     同一个物理偏移 Δh 在图像里是 f·Δh/D，而灯的表观宽度 W = f·Dt/D，
+//     两式相除得 像素偏移 = W · (Δh/Dt) —— 距离 D 已经被 W 隐含掉了。
 //
 //   参数与按键说明见 README.md 与 doc/vision_pipeline.md。
 //
@@ -24,18 +37,20 @@
 `timescale 1ns / 1ps
 
 module armor_vision #(
-    parameter IMG_W      = 800        ,   // 图像宽（= LCD 宽度，1:1 不缩放）
-    parameter IMG_H      = 480        ,   // 图像高
-    parameter AW         = 10         ,   // 坐标位宽
-    parameter MORPH_N    = 9          ,   // 形态学窗口大小（9 -> 偏移 8 行/像素）
-    parameter CLK_FREQ   = 25_000_000 ,   // 工作时钟频率
-    parameter TH_G_DEF   = 8'd100     ,   // TH_G   默认值（借自 dart 的 400>>2）
-    parameter TH_GR_DEF  = 8'd32      ,   // TH_G-R 默认值（借自 dart 的 130>>2）
-    parameter TH_GB_DEF  = 8'd32      ,   // TH_G-B 默认值（借自 dart 的 130>>2）
-    parameter TH_MIN     = 24         ,   // 投影直方图阈值（一列/一行的最少亮点数）
-    parameter MIN_SIZE   = 24         ,   // 目标最小边长
-    parameter RING_T     = 2          ,   // 圆环半宽（像素）
-    parameter CROSS_L    = 12             // 十字臂长（像素）
+    parameter IMG_W       = 800        ,   // 图像宽（= LCD 宽度，1:1 不缩放）
+    parameter IMG_H       = 480        ,   // 图像高
+    parameter AW          = 10         ,   // 坐标位宽
+    parameter MORPH_N     = 9          ,   // 形态学窗口大小（9 -> 偏移 8 行/像素）
+    parameter CLK_FREQ    = 25_000_000 ,   // 工作时钟频率
+    parameter TH_G_DEF    = 8'd100     ,   // TH_G   默认值（借自 dart 的 400>>2）
+    parameter TH_GR_DEF   = 8'd32      ,   // TH_G-R 默认值（借自 dart 的 130>>2）
+    parameter TH_GB_DEF   = 8'd32      ,   // TH_G-B 默认值（借自 dart 的 130>>2）
+    parameter [7:0] REL_SAT_PCT = 8'd20,   // 相对饱和度下限（%）；0 = 关闭抗反光闸
+    parameter TH_MIN      = 4          ,   // 投影阈值：一列/一行的最少亮点数
+    parameter MIN_SIZE    = 24         ,   // 目标最小边长
+    parameter [7:0] AIM_H_Q8 = 8'd64   ,   // 瞄准点在灯心上方 = 宽度 x AIM_H_Q8/256
+    parameter RING_T      = 2          ,   // 圆环半宽（像素）
+    parameter CROSS_L     = 12             // 十字臂长（像素）
 )(
     input                clk        ,   // 工作时钟（lcd_clk）
     input                rst_n      ,   // 复位
@@ -47,10 +62,12 @@ module armor_vision #(
     output     [3:0]     led        ,   // LED 指示（低电平点亮）
     output     [5:0]     seg_sel    ,   // 数码管位选（低电平选通）
     output     [7:0]     seg_led    ,   // 数码管段码（低电平点亮）
-    // 调试观察用
+    // 调试观察 / 后续送云台用
     output               bond_valid ,   // 检测到目标
-    output     [AW-1:0]  center_x   ,   // 圆心 x
-    output     [AW-1:0]  center_y       // 圆心 y
+    output     [AW-1:0]  center_x   ,   // 绿圆灯心 x
+    output     [AW-1:0]  center_y   ,   // 绿圆灯心 y
+    output     [AW-1:0]  aim_x      ,   // 瞄准点 x（= 灯心 x）
+    output     [AW-1:0]  aim_y          // 瞄准点 y（灯心往上偏一点）
 );
 
 //localparam define
@@ -148,9 +165,11 @@ vision_cfg #(
 );
 
 //-------------------------------------------------------
-// (2) 绿色分割
+// (2) 绿色分割：绝对判据 + 相对饱和度闸（抗反光）
 //-------------------------------------------------------
-color_seg u_color_seg (
+color_seg #(
+    .REL_SAT_PCT (REL_SAT_PCT)
+) u_color_seg (
     .rgb565 (data_v   ),
     .th_g   (th_g     ),
     .th_gr  (th_gr    ),
@@ -213,15 +232,16 @@ video_delay #(
 );
 
 //-------------------------------------------------------
-// (5) 双投影找绿块：X 直方图取最宽列 run、Y 直方图取最长行 run
+// (5) 双投影找绿块（取外沿，抗反光洞）+ 圆心 + 瞄准点
 //-------------------------------------------------------
 proj_bond #(
-    .WIDTH    (IMG_W   ),
-    .HEIGHT   (IMG_H   ),
-    .AW       (AW      ),
-    .Y_GUARD  (Y_GUARD ),
-    .TH_MIN   (TH_MIN  ),
-    .MIN_SIZE (MIN_SIZE)
+    .WIDTH    (IMG_W      ),
+    .HEIGHT   (IMG_H      ),
+    .AW       (AW         ),
+    .Y_GUARD  (Y_GUARD    ),
+    .TH_MIN   (TH_MIN     ),
+    .MIN_SIZE (MIN_SIZE   ),
+    .AIM_H_Q8 (AIM_H_Q8   )
 ) u_proj_bond (
     .clk        (clk        ),
     .rst_n      (rst_n      ),
@@ -236,13 +256,15 @@ proj_bond #(
     .bond_t     (bt         ),
     .bond_b     (bb         ),
     .center_x   (center_x   ),
-    .center_y   (center_y   )
+    .center_y   (center_y   ),
+    .aim_x      (aim_x      ),
+    .aim_y      (aim_y      )
 );
 
 assign bond_w = {1'b0, br} - {1'b0, bl} + 1'b1;
 
 //-------------------------------------------------------
-// (6) 叠印：红色圆环 + 中心十字
+// (6) 叠印：红色圆环（套住灯）+ 瞄准点十字
 //-------------------------------------------------------
 overlay_box #(
     .AW      (AW     ),
@@ -258,6 +280,8 @@ overlay_box #(
     .bb    (bb        ),
     .cx    (center_x  ),
     .cy    (center_y  ),
+    .ax    (aim_x     ),
+    .ay    (aim_y     ),
     .draw  (draw      )
 );
 

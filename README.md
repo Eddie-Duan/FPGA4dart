@@ -4,11 +4,20 @@
 
 A bold attempt at using FPGA / ZYNQ to enable the **DART robot** in RoboMaster.
 This repository currently contains a **pure-Verilog vision pipeline** (no neural network):
-the dart target is **one big green circular lamp**, so the pipeline segments green, cleans it up
-with morphology, locates the circle by **dual projection**, and draws a **red ring + center cross**
-onto a 4.3" RGB LCD. A 6-digit 7-segment display shows the three color thresholds live.
+the dart target is **one big green circular lamp**, so the pipeline segments green (absolute
+difference test **plus** a scale-invariant relative-saturation gate), cleans it up with morphology,
+locates the circle by **dual projection of the histogram outer edges**, and draws a **red ring +
+aim-point cross** onto a 4.3" RGB LCD. A 6-digit 7-segment display shows the thresholds live.
 
-Built on top of the ALIENTEK (正點原子) Da Vinci **XC7A35T** example project *39_ov5640_lcd*
+The pipeline is hardened against the panel's specular glare by two **scale-invariant** algorithm
+measures — a relative-saturation gate, and a projection that takes the **outer edges** of the
+histograms so a glare hole punched through the lamp can no longer split the bounding box in half.
+The dart project additionally pins the camera to a **fixed exposure**; that lock ships here too
+(`tools/patch_camera_lock.py`), but it is **off by default** (`CAM_LOCK_EN = 1'b0`) — it needs
+per-room calibration, and a bad value shows up as a **black screen** (§9) — while the algorithm
+measures already carry the anti-glare duty on their own.
+
+Built on top of the ALIENTEK (正点原子) Da Vinci **XC7A35T** example project *39_ov5640_lcd*
 (`OV5640 → DDR3 frame buffer → RGB LCD`).
 
 ```
@@ -22,9 +31,9 @@ OV5640 (RGB565 800×480) → DDR3 ping-pong buffer → [ green seg → morpholog
 | **Camera** | OV5640, RGB565, 800×480 |
 | **Display** | 4.3" RGB LCD, 800×480, pixel clock 25 MHz (1:1, no scaling) |
 | **Tool** | Vivado 2020.2 |
-| **Verification** | `xsim` self-checking testbench — 33/33 checks pass |
-| **Synthesis** | 0 errors / 0 warnings / 0 latches — LUT 3275 (15.8%), FF 787 (1.9%), LUTRAM 2082, DSP 4, BRAM 0 |
-| **Reference** | color judgment borrowed from the dart2026 open-source FPGA IP (`Threshold.v`) |
+| **Verification** | `xsim` self-checking testbench — 44/44 checks pass (incl. a glare-band regression test) |
+| **Synthesis** | 0 errors / 0 warnings / 0 latches — LUT 3332 (16.0%), FF 750 (1.8%), LUTRAM 2114, DSP 4, BRAM 0 |
+| **Reference** | color test from the dart2026 open-source FPGA IP (`Threshold.v`); fixed-exposure approach from its `hikrobot.cpp` |
 | **License** | MIT (see [LICENSE](LICENSE)) |
 
 ### Repository layout
@@ -73,12 +82,14 @@ LEDs: `led[0..2]` which threshold is selected · `led[3]` target detected (solid
 
 | 功能 | 说明 |
 |---|---|
-| 绿色分割 | RGB565 → 1bit 二值图，判据 `G>=TH_G && G-R>=TH_G-R && G-B>=TH_G-B`（借自 dart 的 `Threshold.v`） |
+| 绿色分割 | RGB565 → 1bit 二值图。**两道闸**：绝对判据 `G>=TH_G && G-R>=TH_G-R && G-B>=TH_G-B`（借自 dart 的 `Threshold.v`）+ **相对饱和度** `100*(max-min) >= max*20%`（尺度无关，抗反光） |
 | 形态学去噪 | 9×9 膨胀 → 9×9 腐蚀 = **闭运算**，填补绿圆内部小洞、去掉碎点 |
-| 目标定位 | **双投影**：X 直方图找最宽的连续亮列 run → 左右边界；Y 直方图找最长的连续亮行 run → 上下边界 |
-| 圆形状校验 | 宽高都 ≥ `MIN_SIZE`、宽高比在 2:1 内、峰列高度 ≥ 3/4 高 —— 挡掉反光块 / 杂色块 |
-| 标记输出 | **红色圆环**（半径 = (宽+高)/4，环宽 ±`RING_T`）+ 中心十字；另可切纯二值图模式方便调阈值 |
-| 数码管 | 6 位共阳数码管实时显示「阈值编号 + 选中阈值(000~255) + 目标宽度/10」 |
+| 目标定位 | **双投影取外沿**：X 直方图取第一个/最后一个 ≥ `TH_MIN` 的列 → 左右边界，Y 同理 → 上下边界。**抗反光**：反射在灯上打出的洞不会把框切成两半 |
+| 圆形状校验 | 宽高都 ≥ `MIN_SIZE`、宽高比在 2:1 内、峰列高度 ≥ 高度的一半 —— 挡掉杂色块、「两块分开的绿块」 |
+| 瞄准点 | 打击点在绿灯**上方一点** → 把圆心往上偏移 `宽度 × AIM_H_Q8/256` 像素（默认 1/4）。**不需要额外测距**，距离已被「表观宽度」隐含（推导见 §7） |
+| 相机抗反光 | **默认靠算法**（下面两道尺度无关的闸）。另附**可选**的相机固定曝光 `CAM_LOCK_EN`：默认 `1'b0` 保持原厂自动曝光；固定曝光要按现场亮度标定，标错会「黑屏」，见 §9 |
+| 标记输出 | **红色圆环**套住绿灯（半径 = (宽+高)/4，环宽 ±`RING_T`）+ **瞄准点红色十字**；另可切纯二值图模式方便调阈值 |
+| 数码管 | 6 位共阳数码管实时显示「阈值编号 + 选中阈值(000~255) + 目标宽度/10」（宽度同时也是测距的原料） |
 | 状态指示 | 4 颗 LED：当前在调哪个阈值（3 颗）、检测到目标（常亮 / 未检测到时 1.5Hz 闪） |
 
 ### 2. 硬件与环境
@@ -135,7 +146,7 @@ flowchart TD
     MASK --> PROJ["proj_bond<br/>双投影<br/>最宽列 run / 最长行 run"]
     MASK --> MIX["显示合成"]
     DLY --> MIX
-    PROJ --> OVL["overlay_box<br/>红色圆环 + 中心十字"]
+    PROJ --> OVL["overlay_box<br/>红色圆环 + 瞄准点十字"]
     PROJ --> SEGD["seg_display<br/>6 位数码管"]
     OVL --> MIX
     MIX --> LCD["4.3 寸 RGB LCD 800×480"]
@@ -148,8 +159,10 @@ flowchart TD
    调试时直方图数值可以直接看。（dart 工程用的是完整 CCL `FindBond.v`，本工程是它的轻量替代。）
 2. **形态学窗口是「右下角对齐」**：二值图在屏幕上会整体往右下偏移 `N-1 = 8` 像素，
    所以用 `video_delay` 把**原图也延迟 8 行 + 8 像素**，两者在屏幕上完全对齐，圆环才不会画歪。
-3. **环与十字画在同一像素流坐标上**：`proj_bond` 统计出来的坐标就是屏幕坐标，`overlay_box` 直接比对，
-   不需要额外坐标转换。
+3. **投影取「外沿」而不是「最长区间」**：反射会在灯上打出一个横贯的洞，取最长连续区间会把灯切成两半
+   （实测洞高 10px 就让框高从 199 掉到 94、圆心整体上移 50 多像素 —— 看起来就是「识别不到」）。
+   改取「第一个 / 最后一个 ≥ `TH_MIN` 的位置」只关心外沿，洞完全不影响；
+   代价是对「两块分开的绿块」更敏感，所以形状校验里的宽高比 + 峰值高度必须留着。
 
 **时间关系**：直方图在有效显示行累加；帧末（`rd_vsync` 后的垂直消隐）先扫 X（801 拍）再扫 Y（481 拍），
 共约 1283 拍；垂直消隐有约 47000 拍（1056 × 45），非常宽裕。
@@ -165,29 +178,40 @@ cd sim
 
 测试台造出与 `lcd_driver`（800×480 面板）**完全相同**的时序，图像为
 **一个绿色实心圆**（圆心 (400,240)、半径 100、`RGB565 = 0x750E` → `r8=118 g8=162 b8=118`，
-即 `G-R = G-B = 44`），并验证 33 项：
+即 `G-R = G-B = 44`），并验证 **44 项**：
 
 | 阶段 | 检查 | 期望 | 说明 |
 |---|---|---|---|
 | 1 | `bond_l` / `bond_r` | 309 / 507 | 圆心 + 形态学偏移 8 后是 (408,248)，半径 100 |
 | 1 | `bond_t` / `bond_b` | 149 / 347 | 上下同理 |
 | 1 | `center_x` / `center_y` | 408 / 248 | 圆心 |
-| 1 | `bond_w` | 199 | 投影阈值 `TH_MIN=24` 让左右各内缩 1 像素 |
+| 1 | `bond_w` | 199 | 一列弦长 ≥ `TH_MIN=4` 要求 `\|d\| <= 99` |
+| 1 | `aim_x` / `aim_y` | 408 / **199** | 瞄准点 = 圆心往上 `199×64/256 = 49` 像素 |
 | 1 | `inside_green` | `0x750E` | 圆内：命中 → 保持原色（不变暗） |
 | 1 | `bg_dim` | `0x4208` | 圆外背景：未命中 → 亮度减半 |
-| 1 | `ring_red` / `center_red` | `0xF800` | 圆环上 (507,248) 与圆心都是红色标记 |
-| 2 | `sel` | 1 | 按 `key[0]` 一次 → 选中项切到 `TH_G-R` |
-| 3 | `th_gr` / `bond_valid` | 48 / 0 | 按 `key[1]` 两次 → `TH_G-R` 48 > 44 → **目标丢失** |
-| 4 | `th_gr` / `bond_valid` | 32 / 1 | 按 `key[2]` 两次 → 阈值回来 → **恢复检测** |
-| 5 | `sel` | 2 | 再按 `key[0]` 一次 → 选中项切到 `TH_G-B` |
-| 6 | `disp_bin` / `bin_white` | 1 / `0xFFFF` | 按 `key[3]` → 纯二值模式，圆内显示白色 |
+| 1 | `ring_red` | `0xF800` | 圆环上 (507,248)，`dx=99` 落在 97..101 环带 |
+| 1 | `cctr_green` | `0x750E` | 圆心不再画十字（十字已经移到瞄准点） |
+| 1 | `aim_red` | `0xF800` | 瞄准点 (408,199) 上是红色十字 |
+| 2 | `bond_*` / `center_y` | 310/506/149/347，cy=248 | **眩光回归测试**：盖一条横贯圆心的白带（py 225..255） |
+| 2 | `bond_w` | 197 | 眩光让左右各内缩 1 像素（边缘列被吃掉了） |
+| 2 | 撤掉眩光后 | 309 / 原色 / 红环 | 必须完全恢复 |
+| 3 | `sel` | 1 | 按 `key[0]` 一次 → 选中项切到 `TH_G-R` |
+| 4 | `th_gr` / `bond_valid` | 48 / 0 | 按 `key[1]` 两次 → `TH_G-R` 48 > 44 → **目标丢失** |
+| 5 | `th_gr` / `bond_valid` | 32 / 1 | 按 `key[2]` 两次 → 阈值回来 → **恢复检测** |
+| 6 | `sel` | 2 | 再按 `key[0]` 一次 → 选中项切到 `TH_G-B` |
+| 7 | `disp_bin` / `bin_white` | 1 / `0xFFFF` | 按 `key[3]` → 纯二值模式，圆内显示白色 |
 
-实测输出：`==== ALL CHECKS PASSED ====`（33 项）。
+实测输出：`==== ALL CHECKS PASSED ====`（44 项）。
+
+> **阶段 2 是关键回归**：旧版「取最长连续 run」的投影在这里会退化成
+> `h≈84`、`center_y≈190`（框只剩上半边）—— 那就是「转一点角度就识别不到」的现场。
+> 改成「取外沿」后，眩光带高 60px 也仍然给出正确的 149/347、圆心 y=248。
 
 > 期望值的推导：形态学窗口「右下角对齐」，膨胀+腐蚀后二值图整体往右下偏 8 像素，
 > 所以二值图上圆心是 (400+8, 240+8) = (408,248)、半径仍是 100。
-> 投影阈值 `TH_MIN=24`：一列的弦长 `2*sqrt(100²-d²) >= 24` 要求 `|d| <= 99`，
-> 于是左右 = `408±99` = [309,507]、上下 = `248±99` = [149,347]，宽高都是 199。
+> `TH_MIN=4`：一列弦长 `2*sqrt(100²-d²) >= 4` 要求 `|d| <= 99`，于是左右 = `408±99` = [309,507]、
+> 上下 = `248±99` = [149,347]，宽高都是 199。
+> 这套期望值有独立推演：`tools/model_morph.py` 里的 Python 参考模型会跑出同样的数字。
 
 ### 6. 按键 / LED / 数码管
 
@@ -222,13 +246,59 @@ cd sim
 
 RGB565 先展成 8bit：`r8={R5,R5[4:2]}`、`g8={G6,G6[5:4]}`、`b8={B5,B5[4:2]}`
 
+**闸 1（绝对判据，借自 dart 的 `Threshold.v`）**：
+
 | 判据 | 条件 |
 |---|---|
 | 绿 | `(g8 >= TH_G) && (g8-r8 >= TH_G-R) && (g8-b8 >= TH_G-B)` |
 
 三个判断式用的都是**带符号差值**，所以「白」「灰」（`G-R ≈ 0`）不会被误判成绿。
-这个形式直接借自 dart 工程的 `Threshold.v`（那边是 10bit 影像，默认 `400 / 130 / 130`），
-折算到 8bit 就是本工程的默认 `100 / 32 / 32`。
+dart 那边是 10bit 影像、默认 `400 / 130 / 130`，折算到 8bit 就是本工程的 `100 / 32 / 32`。
+
+**闸 2（相对饱和度，本工程为抗反光新加，尺度无关）**：
+
+```
+mx = max(r8,g8,b8)   mn = min(r8,g8,b8)   chro = mx - mn
+100*chro >= mx * REL_SAT_PCT        // 默认 20（%）
+```
+
+闸 1 是**绝对**差值。LCD 面板有光泽，一旦被房间灯照出镜面反射，相机 AEC 会把整帧曝光拉走（全画面变暗）、
+AWB 会把白平衡推走（差值整体缩小），于是**局部眩光被放大成「整个目标消失」**。
+闸 2 只看「色度占最亮通道的比例」：整体变暗/变淡时分子分母同比例缩放，判据不变；
+白光眩光 `chro ≈ 0`，会被干脆地排除。把 `REL_SAT_PCT` 设成 0 就关掉闸 2（回到纯 dart 判据）。
+
+**闸 2 是本工程抗反光的主力**：它让判据对相机自动曝光 / 自动白平衡的漂移免疫，
+所以**即使相机保持原厂自动（默认）也能撑住**，不依赖任何需要现场标定的手调寄存器。
+
+### 7.1 瞄准点：为什么不需要额外测距
+
+靶标的实际打击点在绿色灯**上方一点**（设物理偏移 Δh，灯的实际直径 Dt）。针孔模型下：
+
+$$
+W = f_{px}\cdot\frac{D_t}{D}\;(\text{灯的表观宽度})\qquad \Delta_{pix} = f_{px}\cdot\frac{\Delta h}{D}\;(\text{打击点的像素偏移})
+$$
+
+两式相除，**距离 D 直接消掉**：
+
+$$
+\Delta_{pix} = W\cdot\frac{\Delta h}{D_t}
+$$
+
+也就是说：**像素偏移只跟「表观宽度」成正比**，比例系数就是「物理偏移 / 灯直径」。
+所以只要标定这个比例（`AIM_H_Q8`，Q0.8 定点，默认 64 = 1/4），就能直接算瞄准点，
+不需要单独测距 —— 距离信息已经隐含在宽度里了。
+
+> **dart 工程怎么做的**：它的相机看的也是灯心，另外叠一个**角度**偏移。
+> 距离由「目标的表观**面积**」查表得到（`alg_proportional_navigation.c`：
+> `photo_target_distance = lookup(area_to_distance, (w-8)*(h-8))`，表定义在 `lib_table.h`，
+> 500 点、50cm~1500cm，`area ∝ 1/D²`），再拿它去查弹道/下坠曲线
+> （`task_control.c` 的 `target_atatact_theta = 30 - (10/400)*distance + ...`，
+> 以及 `WORLD_VFOV_ADD_ANGLE_RAD_MAX/MIN = 10°/3°`）。
+> 结论：**dart 确实要距离**，但它是从「表观尺寸」反推的，不是靠额外传感器；
+> 而「打击点比灯高一点」这种**目标本身的几何偏移**，用宽度就够了（上面的公式）。
+> 真正必须知道距离的是**弹道下坠**——那是飞控侧的事，本视觉管线不做。
+
+> 数码管上「目标宽度 ÷ 10」那两位就是测距的原料：宽度 × 距离 ≈ 常数（灯的实际直径固定）。
 
 参数都在 `armor_vision.v` 的 parameter（改完重新综合即可）：
 
@@ -237,11 +307,13 @@ RGB565 先展成 8bit：`r8={R5,R5[4:2]}`、`g8={G6,G6[5:4]}`、`b8={B5,B5[4:2]}
 | `TH_G_DEF` | 100 | 绿色亮度下限。**灯亮但检测不到**先调它（dart 的 400/4） |
 | `TH_GR_DEF` | 32 | `G-R` 差值下限。受环境光/白平衡影响最大（dart 的 130/4） |
 | `TH_GB_DEF` | 32 | `G-B` 差值下限 |
-| `TH_MIN` | 24 | 投影阈值：一列/一行的最少亮点数。**圆没被框住先调这个**（0~480） |
+| `REL_SAT_PCT` | 20 | 相对饱和度下限（%）。**抗反光闸**；设 0 = 关闭 |
+| `TH_MIN` | 4 | 投影阈值：一列/一行的最少亮点数。「取外沿」用它判定哪一列/行算数 |
 | `MIN_SIZE` | 24 | 目标最小边长（宽、高都要 ≥ 它），挡小碎点 |
+| `AIM_H_Q8` | 64 | 瞄准点在灯心上方 = 宽度 × (AIM_H_Q8/256)。**现场标定**：量「打击点到灯心」和「灯直径」的比 |
 | `MORPH_N` | 9 | 形态学窗口（dart 用 9）。噪点多→9；想省资源→5 或 3（延迟行数跟着减半） |
 | `RING_T` | 2 | 圆环半宽（像素） |
-| `CROSS_L` | 12 | 中心十字臂长（像素） |
+| `CROSS_L` | 12 | 瞄准点十字臂长（像素） |
 | `CLK_FREQ` | 25000000 | 只用于按键消抖时间（4.3" 800×480 的 `lcd_clk` = 25MHz） |
 
 ### 8. 资源使用（Vivado 2020.2，`armor_vision` out-of-context 综合）
@@ -249,14 +321,14 @@ RGB565 先展成 8bit：`r8={R5,R5[4:2]}`、`g8={G6,G6[5:4]}`、`b8={B5,B5[4:2]}
 | 模块 | LUT | 其中 LUTRAM | FF | DSP |
 |---|---|---|---|---|
 | `video_delay`（8 行 × 800 × 16bit） | 1999 | 1664 | 128 | 0 |
-| `proj_bond`（两个直方图） | 613 | 210 | 177 | 0 |
-| `morph_nxn` ×2 | 181 + 178 | 208 | 144 | 0 |
+| `proj_bond`（两个直方图） | 595 | 242 | 135 | 0 |
+| `morph_nxn` ×2 | 182 + 176 | 208 | 144 | 0 |
 | `vision_cfg`（四颗按键消抖） | 158 | 0 | 119 | 0 |
-| `overlay_box`（圆环两个平方 + 距离） | 55 | 0 | 0 | 4 |
-| `color_seg` | 18 | 0 | 0 | 0 |
-| `seg_display` | 29 | 0 | 19 | 0 |
-| 顶层与显示合成 | 44 | 0 | 200 | 0 |
-| **合计** | **3275（15.8%）** | 2082 | **787（1.9%）** | **4（4.4%）** |
+| `color_seg`（绝对判据 + 相对饱和度） | 90 | 0 | 0 | 0 |
+| `overlay_box`（圆环两个平方 + 十字） | 56 | 0 | 0 | 4 |
+| `seg_display` | 32 | 0 | 19 | 0 |
+| 顶层与显示合成 | 44 | 0 | 205 | 0 |
+| **合计** | **3332（16.0%）** | 2114 | **750（1.8%）** | **4（4.4%）** |
 
 Block RAM 0。原 39 例程（DDR3 MIG + FIFO + 相机 + LCD）的资源仍然充裕。
 完整报告：`doc/synth_utilization_vision.rpt`、`doc/synth_utilization_hier.rpt`。
@@ -274,24 +346,28 @@ Block RAM 0。原 39 例程（DDR3 MIG + FIFO + 相机 + LCD）的资源仍然�
 
 | 症状 | 处理 |
 |---|---|
-| 完全没有标记、`led[3]` 一直闪 | ① 按 `key[3]` 切纯二值图，用 `key[0]`+`key[1]`/`key[2]` 把绿色调干净 ② 看数码管上 `TH_MIN` 是否太高 ③ 圆太小 → `MIN_SIZE` / `TH_MIN` 调小 |
-| 二值图里绿圆是**白色一片** | 相机自动曝光把灯打爆成白色了（饱和后 `G-R ≈ 0` 判不出颜色）→ 降低环境光，或关掉 AEC/AWB 改固定曝光（见下条） |
-| 一转屏幕角度就整个识别不到 | LCD 有光泽，房间灯按镜面反射射进镜头会**触发 OV5640 的自动曝光/自动白平衡**，把整幅画面的亮度/色彩一起拉走，固定阈值随即全线失守。建议把 `i2c_ov5640_rgb565_cfg.v` 的 `0x3503` 设成手动、给死曝光与增益（`0x3406` 同理关 AWB）——dart 工程就是固定曝光 + 固定增益；物理上可贴防眩光膜或加偏振片 |
-| 标记画歪 / 圆环不贴边 | ① 圆环半径由 `(宽+高)/4` 得来，边界框不准就会歪 → 先看二值图 ② `RING_T` / `CROSS_L` 调粗细 |
-| 框跳来跳去 | ① 阈值卡在边缘 → 调 `TH_MIN` ② 背景有同色大面积 → 提高 `TH_G` ③ `MIN_SIZE` 调大一点 |
+| 完全没标记、`led[3]` 一直闪 | ① 按 `key[3]` 切纯二值图，用 `key[0]`+`key[1]`/`key[2]` 把绿色调干净 ② 看数码管确认阈值 ③ `TH_MIN` / `MIN_SIZE` 是否设太大 |
+| 二值图里绿圆是**白色一片** | 相机曝光把灯打爆成白色了（饱和后 `G-R ≈ 0` 判不出颜色）→ 调小 `i2c_ov5640_rgb565_cfg.v` 里的曝光 `EXP_*` |
+| **一转身屏幕角度就整个识别不到** | **已处理**：根因是 LCD 镜面反射 → OV5640 的 AEC/AWB 把整幅画面的亮度/色彩一起拉走，固定阈值全线失守。主力是两条**尺度无关**的算法措施：相对饱和度闸（`color_seg.v`）+ 「取外沿」投影（`proj_bond.v`），都不依赖相机设置。可选的相机固定曝光见下一行 |
+| **屏幕全黑**（背光亮着但没图像） | ① 先按 `key[3]` 退出纯二值图模式 —— 没有绿目标时纯二值图本来就是全黑，1 秒可排除。② 若仍黑：**必是相机没出图**，因为 `lcd_driver.v` 里 `lcd_bl` 写死 `1'b1`（背光常亮），所以「黑」只能是像素数据本身是黑的。最常见原因是**相机改成了手动曝光而曝光值太小**（踩过这个坑：写死 `0x0200`，整屏黑）。修复：把 `CAM_LOCK_EN` 改回 `1'b0`，或 `Copy-Item _backup_before_green\rtl\i2c_ov5640_rgb565_cfg.v rtl\ -Force` |
+| 想启用相机固定曝光 | 把 `rtl/i2c_ov5640_rgb565_cfg.v` 的 `CAM_LOCK_EN` 改成 `1'b1`，然后**上电看着 LCD** 调 `EXP_15_8`：太暗就加大（`0x01`→`0x02`→`0x04`→`0x08`…），过曝发白就减小，大致范围 `0x0100`（很暗）~ `0x2000`（很亮）；增益 `GAIN_7_0`（`0x10`=1x）。**换环境要重标**，这就是它默认关掉的原因 |
+| 圆环/十字位置不对 | ① 环半径由 `(宽+高)/4` 得，先看二值图干不干净 ② 十字画在**瞄准点**上，位置由 `AIM_H_Q8` 决定，标定不准就调它 |
+| 框跳来跳去 | 提高 `TH_G` / 把 `MIN_SIZE` 调大 / `MORPH_N` 调大 |
 | 画面最上面 16 行有残影 | 行缓冲在帧首还没填满，检测端已用 `Y_GUARD` 排除；残影只是显示 |
 | 数码管显示倒过来 | 板子位选顺序与本模块假设相反 → 把 `seg_display.v` 的 `SEG_REV` 参数设成 `1` |
 | 资源不够 / 时序不过 | `MORPH_N` 改 5 或 3 |
 
 ### 10. 已知限制与后续方向
 
-- **只输出一个目标**：取最宽列 run / 最长行 run，画面里同时出现多个绿块时只会框住最大的那一个
+- **只输出一个目标**：取 X/Y 直方图的外沿，画面里同时出现多个绿块时会把它们连成一个框（**会被形状校验挡住 → 不输出**）
   → 需要多目标就要上完整 CCL（可参考 dart 工程的 `FindBond.v`：256 标签 + BRAM 存每块结构 + 帧末选面积最大的）
-- **没有距离/大小解算**：目前只给圆心与边界框
-  → 要报靶需要相机内参 + 靶标实际直径
-- **颜色分割对光照敏感**：可加自适应阈值（例如用整帧直方图峰值动态定 `TH_MIN`）；
-  也可以把判据改成「相对饱和度」（`(max-min)*4 >= max`）让整体变暗/变淡时依然成立
-- 其他可延伸：圆心经 UART 送给上位机 / 加 ILA 观察两个直方图峰值 / 圆心坐标接 OLED
+- **没有弹道下坠补偿**：目前只给圆心与瞄准点（目标几何偏移），不含飞行下坠
+  → 下坠是**角度**偏移、与距离和弹速都有关，属于飞控侧；dart 用「表观面积 → 距离 → 下坠曲线」两步算，
+     本工程已经把「表观宽度」放在了数码管上，需要时可直接接过去
+- **相机固定曝光是「选配」且默认关闭**：`CAM_LOCK_EN = 1'b0` 时相机保持原厂自动曝光 / 自动白平衡，
+  抗反光完全由两条尺度无关的算法措施承担。想要 dart 那种「曝光锁死」的极致稳定性，
+  把 `CAM_LOCK_EN` 打开并按现场亮度标定一次（换环境要重标 —— 这是拿通用性换稳定性）
+- 其他可延伸：瞄准点经 UART 送给云台 / 加 ILA 观察两个直方图峰值
 - 对应《RM飞镖FPGA视觉方案》文件的阶段 1~6 皆已完成（验证对照表见 `doc/vision_pipeline.md`）
 
 ### 11. 还原
@@ -304,6 +380,14 @@ Copy-Item _backup_before_green\prj\ov5640_lcd.srcs\constrs_1\new\pin.xdc prj\ov5
 Copy-Item _backup_before_green\sim\tb_armor_vision.v        sim\        -Force
 Copy-Item _backup_before_green\README.md                    .\          -Force
 Copy-Item _backup_before_green\vision_pipeline.md           doc\        -Force
+```
+
+只把**相机固定曝光**单独退回去：
+
+```powershell
+# 方式一（推荐）：把 CAM_LOCK_EN 改成 1'b0 —— 等价于原厂行为，别的都不用动
+# 方式二：整个文件退回原厂版本（相机配置就完全回到 39 例程）
+Copy-Item _backup_before_green\rtl\i2c_ov5640_rgb565_cfg.v rtl\ -Force
 ```
 
 未加入视觉管线**之前**的原始 39 例程文件在 `_backup_before_vision/`：
@@ -325,6 +409,8 @@ Copy-Item _backup_before_vision\ov5640_lcd.xpr.bak prj\ov5640_lcd.xpr -Force
 | `synth_check_vision.tcl` | 对 `armor_vision` 做 out-of-context 综合，检查 LUTRAM 推断与资源 |
 | `patch_project.py` | 把视觉管线接进官方 39 例程（已应用过，重复执行会自动跳过） |
 | `patch_green.py` | 从「红蓝灯条」版升级到「绿色圆靶标」版（改 `ov5640_lcd.v` 埠/例化、`pin.xdc` 注释与数码管引脚、`xpr` 注册新文件；字节级安全，可重复执行） |
+| `patch_camera_lock.py` | 加入**可选**的相机固定曝光 / 增益（只加 6 条寄存器：`0x3503` + 曝光×3 + 增益×2；**默认 `CAM_LOCK_EN = 1'b0` 即不启用**）。**完全不碰 AWB**（避免白平衡增益写错），并会自动清掉早期写坏 AWB 的版本；可重复执行 |
+| `model_morph.py` | 视觉管线的 Python 参考模型：验证期望值是怎么来的、试算反光下的行为（不需要综合、不被 xsim 用到） |
 | `to_gbk.py` | 新增文件的中文注释 UTF-8 → GBK（与工程其他文件一致） |
 | `to_simplified_gbk.py` | 把代码档的中文由繁体转成简体、并统一存成 GBK（幂等，可重复执行；`--apply` 才写入） |
 | `check_project_paths.py` | 检查 `.xpr` 引用的文件是否都在（搬移/复制工程后很好用） |
@@ -358,11 +444,13 @@ Copy-Item _backup_before_vision\ov5640_lcd.xpr.bak prj\ov5640_lcd.xpr -Force
 
 | 功能 | 說明 |
 |---|---|
-| 綠色分割 | RGB565 → 1bit 二值圖，判據 `G>=TH_G && G-R>=TH_G-R && G-B>=TH_G-B`（借自 dart 的 `Threshold.v`） |
+| 綠色分割 | RGB565 → 1bit 二值圖。**兩道閘**：絕對判據 `G>=TH_G && G-R>=TH_G-R && G-B>=TH_G-B`（借自 dart 的 `Threshold.v`）+ **相對飽和度** `100*(max-min) >= max*20%`（尺度無關，抗反光） |
 | 形態學去噪 | 9×9 膨脹 → 9×9 腐蝕 = **閉運算**，填補綠圓內部小洞、去掉碎點 |
-| 目標定位 | **雙投影**：X 直方圖找最寬的連續亮欄 run → 左右邊界；Y 直方圖找最長的連續亮列 run → 上下邊界 |
-| 圓形狀校驗 | 寬高都 ≥ `MIN_SIZE`、寬高比在 2:1 內、峰欄高度 ≥ 3/4 高 —— 擋掉反光塊 / 雜色塊 |
-| 標記輸出 | **紅色圓環**（半徑 = (寬+高)/4，環寬 ±`RING_T`）+ 中心十字；另可切純二值圖模式方便調門檻 |
+| 目標定位 | **雙投影取外沿**：X 直方圖取第一個/最後一個 ≥ `TH_MIN` 的欄 → 左右邊界，Y 同理 → 上下邊界。**抗反光**：反射在燈上打出的洞不會把框切成兩半 |
+| 圓形狀校驗 | 寬高都 ≥ `MIN_SIZE`、寬高比在 2:1 內、峰欄高度 ≥ 高度的一半 —— 擋掉雜色塊、「兩塊分開的綠塊」 |
+| 瞄準點 | 打擊點在綠燈**上方一點** → 把圓心往上偏移 `寬度 × AIM_H_Q8/256` 像素（預設 1/4）。**不需要額外測距**，距離已被「表觀寬度」隱含 |
+| 相機抗反光 | **預設靠算法**（兩道尺度無關的閘）。另附**可選**的相機固定曝光 `CAM_LOCK_EN`：預設 `1'b0` 保持原廠自動曝光；固定曝光要按現場亮度標定，標錯會「黑屏」，見 §9 |
+| 標記輸出 | **紅色圓環**套住綠燈（半徑 = (寬+高)/4，環寬 ±`RING_T`）+ **瞄準點紅色十字**；另可切純二值圖模式方便調門檻 |
 | 數碼管 | 6 位共陽數碼管即時顯示「門檻編號 + 選中門檻(000~255) + 目標寬度/10」 |
 | 狀態指示 | 4 顆 LED：目前在調哪個門檻（3 顆）、偵測到目標（常亮 / 未偵測到時 1.5Hz 閃） |
 
@@ -443,24 +531,32 @@ cd sim
 ```
 
 測試台造出與 `lcd_driver`（800×480 面板）**完全相同**的時序，影像為
-**一個綠色實心圓**（圓心 (400,240)、半徑 100、`RGB565 = 0x750E` → `r8=118 g8=162 b8=118`），並驗證 33 項：
+**一個綠色實心圓**（圓心 (400,240)、半徑 100、`RGB565 = 0x750E` → `r8=118 g8=162 b8=118`），並驗證 **44 項**：
 
 | 階段 | 檢查 | 期望 | 說明 |
 |---|---|---|---|
 | 1 | `bond_l` / `bond_r` | 309 / 507 | 圓心 + 形態學偏移 8 後是 (408,248)、半徑 100 |
 | 1 | `bond_t` / `bond_b` | 149 / 347 | 上下同理 |
 | 1 | `center_x` / `center_y` | 408 / 248 | 圓心 |
-| 1 | `bond_w` | 199 | 投影門檻 `TH_MIN=24` 讓左右各內縮 1 像素 |
-| 1 | `inside_green` | `0x750E` | 圓內：命中 → 保持原色 |
-| 1 | `bg_dim` | `0x4208` | 圓外背景：未命中 → 亮度減半 |
-| 1 | `ring_red` / `center_red` | `0xF800` | 圓環上 (507,248) 與圓心都是紅色標記 |
-| 2 | `sel` | 1 | 按 `key[0]` 一次 → 選中項切到 `TH_G-R` |
-| 3 | `th_gr` / `bond_valid` | 48 / 0 | 按 `key[1]` 兩次 → 48 > 44 → **目標遺失** |
-| 4 | `th_gr` / `bond_valid` | 32 / 1 | 按 `key[2]` 兩次 → 門檻回來 → **恢復偵測** |
-| 5 | `sel` | 2 | 再按 `key[0]` 一次 → 選中項切到 `TH_G-B` |
-| 6 | `disp_bin` / `bin_white` | 1 / `0xFFFF` | 按 `key[3]` → 純二值模式，圓內顯示白色 |
+| 1 | `bond_w` | 199 | 一欄弦長 ≥ `TH_MIN=4` 要求 `\|d\| <= 99` |
+| 1 | `aim_x` / `aim_y` | 408 / **199** | 瞄準點 = 圓心往上 `199×64/256 = 49` 像素 |
+| 1 | `inside_green` / `bg_dim` | `0x750E` / `0x4208` | 圓內保持原色；圓外變暗 |
+| 1 | `ring_red` / `cctr_green` / `aim_red` | `0xF800` / `0x750E` / `0xF800` | 環上是紅的、圓心不再畫十字、瞄準點上是紅十字 |
+| 2 | `bond_*` / `center_y` | 310/506/149/347，cy=248 | **眩光回歸測試**：蓋一條橫貫圓心的白帶（py 225..255） |
+| 2 | `bond_w` | 197 | 眩光讓左右各內縮 1 像素 |
+| 3 | `sel` | 1 | 按 `key[0]` 一次 → 選中項切到 `TH_G-R` |
+| 4 | `th_gr` / `bond_valid` | 48 / 0 | 按 `key[1]` 兩次 → 48 > 44 → **目標遺失** |
+| 5 | `th_gr` / `bond_valid` | 32 / 1 | 按 `key[2]` 兩次 → 門檻回來 → **恢復偵測** |
+| 6 | `sel` | 2 | 再按 `key[0]` 一次 → 選中項切到 `TH_G-B` |
+| 7 | `disp_bin` / `bin_white` | 1 / `0xFFFF` | 按 `key[3]` → 純二值模式，圓內顯示白色 |
 
-實測輸出：`==== ALL CHECKS PASSED ====`（33 項）。
+實測輸出：`==== ALL CHECKS PASSED ====`（44 項）。
+
+> **階段 2 是關鍵回歸**：舊版「取最長連續 run」的投影在這裡會退化成 `h≈84`、`center_y≈190`
+> （框只剩上半邊）—— 那就是「轉一點角度就識別不到」的現場。改成「取外沿」後，
+> 眩光帶高 60px 也仍然給出正確的 149/347、圓心 y=248。
+
+> 期望值有獨立推演：`tools/model_morph.py` 的 Python 參考模型會跑出同樣的數字。
 
 ### 6. 按鍵 / LED / 數碼管
 
@@ -502,11 +598,13 @@ RGB565 先展成 8bit：`r8={R5,R5[4:2]}`、`g8={G6,G6[5:4]}`、`b8={B5,B5[4:2]}
 | `TH_G_DEF` | 100 | 綠色亮度下限。**燈亮但偵測不到**先調它 |
 | `TH_GR_DEF` | 32 | `G-R` 差值下限。受環境光/白平衡影響最大 |
 | `TH_GB_DEF` | 32 | `G-B` 差值下限 |
-| `TH_MIN` | 24 | 投影門檻：一欄/一列的最少亮點數。**圓沒被框住先調這個** |
+| `REL_SAT_PCT` | 20 | 相對飽和度下限（%）。**抗反光閘**；設 0 = 關閉 |
+| `TH_MIN` | 4 | 投影門檻：一欄/一列的最少亮點數 |
 | `MIN_SIZE` | 24 | 目標最小邊長，擋小碎點 |
+| `AIM_H_Q8` | 64 | 瞄準點在燈心上方 = 寬度 × (AIM_H_Q8/256)。**現場標定** |
 | `MORPH_N` | 9 | 形態學窗口；想省資源 → 5 或 3 |
 | `RING_T` | 2 | 圓環半寬（像素） |
-| `CROSS_L` | 12 | 中心十字臂長（像素） |
+| `CROSS_L` | 12 | 瞄準點十字臂長（像素） |
 | `CLK_FREQ` | 25000000 | 只用於按鍵消抖時間 |
 
 ### 8. 資源使用
@@ -514,14 +612,14 @@ RGB565 先展成 8bit：`r8={R5,R5[4:2]}`、`g8={G6,G6[5:4]}`、`b8={B5,B5[4:2]}
 | 模組 | LUT | 其中 LUTRAM | FF | DSP |
 |---|---|---|---|---|
 | `video_delay` | 1999 | 1664 | 128 | 0 |
-| `proj_bond` | 613 | 210 | 177 | 0 |
-| `morph_nxn` ×2 | 181 + 178 | 208 | 144 | 0 |
+| `proj_bond` | 595 | 242 | 135 | 0 |
+| `morph_nxn` ×2 | 182 + 176 | 208 | 144 | 0 |
 | `vision_cfg` | 158 | 0 | 119 | 0 |
-| `overlay_box` | 55 | 0 | 0 | 4 |
-| `color_seg` | 18 | 0 | 0 | 0 |
-| `seg_display` | 29 | 0 | 19 | 0 |
-| 頂層與顯示合成 | 44 | 0 | 200 | 0 |
-| **合計** | **3275（15.8%）** | 2082 | **787（1.9%）** | **4（4.4%）** |
+| `color_seg`（絕對判據 + 相對飽和度） | 90 | 0 | 0 | 0 |
+| `overlay_box` | 56 | 0 | 0 | 4 |
+| `seg_display` | 32 | 0 | 19 | 0 |
+| 頂層與顯示合成 | 44 | 0 | 205 | 0 |
+| **合計** | **3332（16.0%）** | 2114 | **750（1.8%）** | **4（4.4%）** |
 
 Block RAM 0。原 39 例程的資源仍然充裕。完整報告：`doc/synth_utilization_vision.rpt`。
 
@@ -529,11 +627,12 @@ Block RAM 0。原 39 例程的資源仍然充裕。完整報告：`doc/synth_uti
 
 | 症狀 | 處理 |
 |---|---|
-| 完全沒有標記、`led[3]` 一直閃 | ① 按 `key[3]` 切純二值圖，把綠色調乾淨 ② `TH_MIN` 是否太高 ③ 圓太小 → `MIN_SIZE` / `TH_MIN` 調小 |
-| 二值圖裡綠圓是**白色一片** | 相機自動曝光把燈打爆成白色了（飽和後 `G-R ≈ 0`）→ 降低環境光，或關掉 AEC/AWB 改固定曝光 |
-| 一轉螢幕角度就整個識別不到 | LCD 有光澤，房間燈按鏡面反射射進鏡頭會**觸發 OV5640 的自動曝光/自動白平衡**，把整幅畫面的亮度/色彩一起拉走，固定門檻隨即全線失守。建議把 `0x3503` 設成手動、給死曝光與增益（`0x3406` 同理關 AWB）——dart 工程就是固定曝光 + 固定增益；物理上可貼防眩光膜或加偏振片 |
-| 標記畫歪 / 圓環不貼邊 | 圓環半徑由 `(寬+高)/4` 得來，先看二值圖是否乾淨 |
-| 框跳來跳去 | 調 `TH_MIN` / 提高 `TH_G` / `MIN_SIZE` 調大 |
+| 完全沒有標記、`led[3]` 一直閃 | ① 按 `key[3]` 切純二值圖，把綠色調乾淨 ② `TH_MIN` / `MIN_SIZE` 是否設太大 |
+| 二值圖裡綠圓是**白色一片** | 相機曝光把燈打爆成白色了 → 調小 `i2c_ov5640_rgb565_cfg.v` 裡的 `EXP_*` |
+| **一轉螢幕角度就整個識別不到** | **已處理**：根因是 LCD 鏡面反射 → OV5640 的 AEC/AWB 把整幅畫面的亮度/色彩一起拉走。主力是兩條**尺度無關**的算法措施：相對飽和度閘（`color_seg.v`）+ 「取外沿」投影（`proj_bond.v`），都不依賴相機設定 |
+| **螢幕全黑**（背光亮著但沒圖像） | ① 先按 `key[3]` 退出純二值圖模式 —— 沒有綠目標時純二值圖本來就是全黑，1 秒可排除。② 若仍黑：**必是相機沒出圖**，因為 `lcd_driver.v` 裡 `lcd_bl` 寫死 `1'b1`（背光常亮），所以「黑」只能是像素資料本身是黑的。最常見原因是**相機改成了手動曝光而曝光值太小**。修復：把 `CAM_LOCK_EN` 改回 `1'b0` |
+| 標記位置不對 | ① 環半徑由 `(寬+高)/4` 得來，先看二值圖乾不乾淨 ② 十字畫在**瞄準點**上，位置由 `AIM_H_Q8` 決定 |
+| 框跳來跳去 | 提高 `TH_G` / `MIN_SIZE` 調大 / `MORPH_N` 調大 |
 | 畫面最上面 16 行有殘影 | 行緩衝在幀首還沒填滿，檢測端已用 `Y_GUARD` 排除 |
 | 數碼管顯示倒過來 | 把 `seg_display.v` 的 `SEG_REV` 設成 `1` |
 | 資源不夠 / 時序不過 | `MORPH_N` 改 5 或 3 |
