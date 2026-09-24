@@ -28,13 +28,24 @@
 | `proj_bond.v` | `proj_bond` | **雙投影找綠塊** + 圓形先驗校驗 + 邊界框 / 圓心 |
 | `overlay_box.v` | `overlay_box` | 疊印**紅色圓環 + 中心十字** |
 | `seg_display.v` | `seg_display` | 6 位共陽數碼管動掃驅動 |
+| `vision_stat.v` | `vision_stat` | **儀錶盤**（P0）：幀率 / 幀週期 / 幀行數 / 掩碼像素數 / 命中率；純觀測，不參與判決 |
+| `median3x3.v` | `median3x3` | **3×3 中值預濾波**（P7）：分離式中值（每行 med3 → 三行中值再 med3），4 個 med3 取代真 3×3 的 19 個比較器 |
+| `blob_track.v` | `blob_track` | **連通團塊跟蹤**（P3，取代 `proj_bond`）：行程編碼 + 4 個團塊記錄 → 外框 / 面積 / 形心 / 填充率 / 數量 |
+| `track_ab.v` | `track_ab` | **時序門控 + α-β 跟蹤**（P4）：門控半徑 + 連續命中/丟失計數 + 位置平滑與速度外推 |
+| `chroma_hist.v` | `chroma_hist` | **自適應閾值**（P5）：G-R / G-B 各 256 bin 直方圖，幀末取分位數當閾值 |
+| `aec_loop.v` | `aec_loop` | **自動曝光閉環**（P6）：統計過曝像素比例，據此微調 0x3501；預設關閉，關時不產生任何 I2C 請求 |
+| `uart_tx.v` / `uart_rx.v` | — | UART 8N1 物理層（P1/P2），純 RTL，不用 Xilinx IP |
+| `result_frame.v` | `result_frame` | **結果上報**（P1）：16 位元組定長幀（頭 + flags + 座標 + 面積 + 填充率 + 校驗） |
+| `reg_file.v` | `reg_file` | **運行時寄存器檔案**（P2）：`0xAA addr data (addr^data)` 寫參數，免重新綜合 |
+| `osd_text.v` | `osd_text` | **OSD**（P8）：3×5 點陣放大 2 倍的數值疊加 + 底部直方圖條形圖 |
+| `proj_bond.v` | `proj_bond` | 舊的雙投影取外沿（已被 `blob_track` 取代，檔案保留作對照，不再例化） |
 | `ov5640_lcd.v` | `ov5640_lcd` | 官方例程頂層（已加 `key`/`led`/`seg_sel`/`seg_led` 埠與視覺例化） |
 
 ### 模擬（`sim/`）
 
 | 檔案 | 說明 |
 |---|---|
-| `tb_armor_vision.v` | 自檢測試台（合成 800×480 綠色實心圓靶標 + 6 個相位共 33 項檢查） |
+| `tb_armor_vision.v` | 自檢測試台（合成 800×480 綠色實心圓靶標 + 貫穿圓心的眩光帶；8 個相位自檢，涵蓋幾何、抗眩光、按鍵、二值顯示、儀錶盤） |
 | `run_vision_sim.bat` | 一鍵跑 xsim（編譯 → 精化 → 模擬） |
 
 ### 工具（`tools/`）
@@ -44,6 +55,13 @@
 | `patch_green.py` | 從「紅藍燈條」版升級到「綠色圓靶標」版（GBK 解碼→改→GBK 編碼，寫回前往返比對） |
 | `patch_camera_lock.py` | 加入**可選**的相機固定曝光 / 增益（6 條寄存器；**預設 `CAM_LOCK_EN = 1'b0` 不啟用**，保持原廠自動曝光）。**完全不碰 AWB**，並會自動清掉早期寫壞 AWB 的版本 |
 | `patch_project.py` | 把視覺管線接進乾淨的官方 39 例程（已套用過） |
+| `add_source.py` | 新增 `rtl/*.v` 的一鍵上戶口：UTF-8 → GBK（回讀比對）+ 註冊進 `.xpr`。轉碼部分可靠；**`.xpr` 那半只能在 Vivado 關著時用** |
+| `add_sources_vivado.tcl` | **註冊源文件的正解**：在 Vivado 的 Tcl Console 裡 `source` 它。工程開著時 Vivado 會用它記憶體裡的檔案列表覆蓋磁碟上的 `.xpr`，外部手改會被靜默冲掉（實測 11 個新模組全被抹掉，綜合報 `module 'uart_rx' not found`） |
+| `uart_parse.py` | PC 端解析 UART 上報幀：`--list` 列可用串口、`COM7` 實時解析、`--hex` 離線解析、`--set` 下發參數 |
+| `check_eol.py` | 檢查 / 修復 `rtl/`、`sim/` 下的換行污染（`\r\r\n`，來自「多行模板字串含 CRLF 再做 `\n`→`\r\n` 還原」）。加 `--fix` 就地修 |
+| `patch_p0_stat.py` | 把 `vision_stat` 儀錶盤接進 `armor_vision`（P0） |
+| `patch_p0_tb.py` | 測試台加 `chk_range` 任務 + `fps` 獨立驗證實例 + phase 8（P0） |
+| `patch_p18_wire.py` | 把 P0~P8 的新埠接起來（`ov5640_lcd` + 測試台）（P1–P8） |
 | `synth_check_vision.tcl` | 對 `armor_vision` 做 out-of-context 合成，報告輸出到 `doc/` |
 | `model_morph.py` | 管線的 Python 參考模型：驗證期望值來源、試算反光下的行為 |
 | `to_gbk.py` | 新檔案的中文註解 UTF-8 → GBK |
@@ -612,4 +630,177 @@ target_atatact_theta -= (10.0f/400.0f) * photo_target_distance;   // 距離越�
 | 紅藍燈條版 | `_backup_before_green/` | 紅/藍分割 + 列投影兩燈條配對 + 綠色邊界框 |
 | **綠色圓靶標版（現行）** | — | 綠色分割三門檻 + 雙投影單綠塊 + 紅色圓環/十字 + 6 位數碼管 |
 
+---
+
+## 16. PL 增強路線圖（對標 dart2026）
+
+讀過 dart 的 PL 側（`dart_-fpga`）後的結論：**dart 的 PL 強在「特徵提取完整度 + 平台化」，
+弱在「自適應與時序」** —— 後者恰好是純 RTL、沒有 PS 的我們最該補的地方。
+
+對比要點：
+
+| 能力 | dart PL | 本專案 |
+|---|---|---|
+| 二值化 | `Threshold.v`：`G≥T_G && G-R≥T_GR && G-B≥T_GB`（三閾值皆 AXI 寄存器） | `color_seg.v`：**同樣三條 + 相對飽和度閘**（多一道，尺度無關） |
+| 形態學 | `ExpansionAnd → Expansion → Corrosion` 多級 | 9×9 膨脹 → 9×9 腐蝕（閉運算） |
+| 特徵提取 | **`FindBond.v` 真 CCL**：256 標籤、每標籤 64bit 結構存 BRAM、並查集重標、累加面積 | **雙投影取外沿**：單框、無面積、多目標必掛 |
+| 多目標 | `bond_dma.v`：每幀**全部** blob 打包 128bit 寫 BRAM + 計數 → PS | 無 |
+| 參數下發 | AXI-Lite 寄存器 + Linux 驅動，執行時可改 | 按鍵 + 數碼管，手動 |
+| 結果上報 | IRQ + AXI 回讀 + DMA 列表 → PS → 飛控 | 只有 LCD / 數碼管 / LED（給人看） |
+| 除錯 | VDMA → DDR + JPEG 編碼 + WiFi 推流 + `system_ila` | 只有 LCD |
+| **時序濾波 / 跟蹤** | **無** | **無** → 兩邊都沒，是本專案的差異化空間 |
+
+### 階段與狀態
+
+每階段都要過三道關：xvlog 無錯 → xsim 自檢全過 → 綜合 0 error / 0 warning / 0 latch。
+新功能一律帶 `XXX_EN` 開關，**預設值保持既有已驗證行為**。
+
+| 階段 | 內容 | 狀態 |
+|---|---|---|
+| P0 | 儀錶盤（fps / 幀週期 / 幀行數 / 掩碼像素數 / 命中率）+ `mark_debug` 供 ILA | **已完成** |
+| P1 | UART 結果輸出（`valid, cx, cy, ax, ay, w, h, checksum`）給雲台 / 飛控 | **已完成** |
+| P2 | 執行時寄存器文件（UART 寫參數，免重新綜合） | **已完成** |
+| P3 | 團塊跟蹤（行程級，取代雙投影）+ 每塊面積 + 形心 + 圓度 | **已完成**（見下方說明） |
+| P4 | 時序門控 + 持久性 + α-β 跟蹤 | **已完成** |
+| P5 | 自適應閾值（每幀直方圖分位數）—— dart 也沒有 | **已完成** |
+| P6 | PL 側自動曝光閉環（不再手猜曝光值） | **已完成**（預設關閉） |
+| P7 | 3×3 中值預濾波 | **已完成**（預設關閉） |
+| P8 | OSD 數值疊加 + 直方圖條形圖 | **已完成**（預設關閉） |
+
+### 兩處刻意偏離原方案（重要）
+
+**P3：用「行程級團塊跟蹤」而不是 dart 的「256 標籤逐像素 CCL + 並查集」**
+dart 的 `FindBond.v` 需要一條 800 深的標籤行緩衝 + 256 項 64bit 結構體表 + 重標表，
+還要一套 3 級流水在同一拍裡解決左右/上下標籤衝突。本專案的 `blob_track.v` 改成：
+每行抽出 mask 的**連通行程**，與 4 個團塊記錄做「水平區間重疊 + 行相鄰」匹配，
+命中多個就合併（面積/矩相加），都沒命中就新建記錄。
+輸出（每塊外框 + 面積 + 形心 + 圓度 + 數量）與 dart 那套**完全一致**，但不需要逐像素
+標籤 RAM 和並查集表，邏輯量約為前者的 1/4，也更好在測試台裡逐項驗證。
+代價：最多同時跟蹤 `K=4` 個團塊（對「一個大的燈」這種靶標綽綽有餘）。
+
+另外這裡**不需要 FIFO 和狀態機**：`emit` 只在 mask 由 1 變 0（或行尾收尾）時產生，
+兩次 emit 至少隔 2 拍，而匹配判定 + 記錄更新是純組合的，正好在 emit 那一拍吃完 ——
+一拍一個行程、零丟棄、無吞吐瓶頸。
+
+**P8：OSD 第四行放填充率而不是距離**
+面積反推距離要開根號，而且相機/鏡頭沒標定之前絕對值沒有意義。
+所以 F3 顯示 `fill_q8`（圓的理論值約 201，一眼看出圓不圓）。
+要距離請拿 F2 的面積在上位機裡算，那裡做 sqrt 是免費的。
+
+### 邊界定義的變化（導致舊測試台的期望值要放寬 1~2 像素）
+
+舊的 `proj_bond` 取直方圖外沿時有 `TH_MIN=4` 的裁剪：邊界上只有 1~3 個亮像素的
+行/列會被丟掉。新的 `blob_track` 報的是**全部亮像素的真實外延**，所以外框會寬 1~2 像素
+（圓心不變，仍是 408/248）。這不是錯誤而是定義變準了，因此測試台對邊界改用
+`chk_near(±2~3)`，而圓心 / 瞄準點 x / 有效性仍然精確比較。
+
+---
+
+## 17. 對外介面：UART 上報與參數寫入
+
+### 結果上報（P1，`result_frame.v`）
+
+每 `TX_DIV`（預設 8）幀發一條 **16 位元組**定長幀，115200 8N1：
+
+| 位元組 | 內容 |
+|---|---|
+| 0 / 1 | `0xA5` / `0x5A` 幀頭 |
+| 2 | flags：b0=`valid`、b1=`adapt_ok`（自適應閾值本幀是否有效）、b2=二值顯示 |
+| 3 / 4 | 圓心 x（16bit，高/低） |
+| 5 / 6 | 圓心 y |
+| 7 / 8 | 瞄準點 x |
+| 9 / 10 | 瞄準點 y |
+| 11 | 外框寬（飽和到 255） |
+| 12 | 面積 >> 7（飽和到 255） |
+| 13 | `fill_q8` 填充率（圓約 201） |
+| 14 | 本幀合格團塊數 |
+| 15 | checksum = byte2..byte14 逐位元組異或 |
+
+    > **已接好引腳**：`uart_rxd` = **U5**（input）、`uart_txd` = **T6**（output），
+    > 電平 LVCMOS33，取自《達芬奇開發板IO引腳分配表》，已在 `pin.xdc` 裡約束。
+    > （表上另有 `uart2_txd`=R19 / `uart2_rxd`=P19，那是 ATK 模組介面，未使用。）
+    >
+    > PC 端解析：`python tools/uart_parse.py COM3`（需 pyserial）；
+    > 離線解析：`python tools/uart_parse.py --hex "A5 5A ..."`；
+    > 下發參數：`python tools/uart_parse.py COM3 --set 0x07 0x01`。
+
+### 參數寫入（P2，`reg_file.v`）
+
+每條命令 **4 位元組**：`0xAA  addr  data  (addr ^ data)`，校驗不過整條丟棄。
+
+| addr | 參數 | 預設 |
+|---|---|---|
+| `0x00` | `TH_G` | 100 |
+| `0x01` / `0x02` | `TH_G-R` / `TH_G-B` | 32 |
+| `0x03` | `REL_SAT_PCT`（>100 夾到 100） | 20 |
+| `0x04` | `MIN_SIZE` | 24 |
+| `0x05` | `AIM_H_Q8` | 64 |
+| `0x06` | `RING_T` | 2 |
+| `0x07` | `CTRL`：b0=自適應 b1=中值 b2=曝光閉環 b3=二值顯示 b4=OSD | 0（全關） |
+| `0x08` | `GATE` 門控半徑 | 96 |
+| `0x09` | `ADAPT_PCT` 自適應前景佔比 | 15 |
+
+寫過一次參數之後，閾值就以寄存器為準；沒寫過則完全沿用按鍵行為 ——
+所以**預設行為與加 UART 之前一模一樣**，這也讓它適合當回退手段。
+
+### P0 細節（`vision_stat.v`）
+
+純觀測模組，不參與任何判決、不改畫面。`vsync` 一律走**邊沿**判定：
+`tb_armor_vision` 裡 `vsync` 是「寬 101 拍的電平」而非單拍脈衝，真機 `rd_vsync` 形態也不好假設；
+若直接拿電平當條件，寬 `vsync` 會把計數器反覆清零，`frame_cyc` 恆為 0。
+
+- **上升沿** = 幀起點 → 鎖存上一幀統計量並清零
+- **下降沿再晚一拍** = `frame_tick`，此時 `proj_bond` 本幀結果已穩定（命中率就在這裡採樣）
+
+`fps` 用「1 秒窗口數 `vsync` 個數」實現，省一個除法器，而且給的是**真實平均值**
+（幀週期抖動時比瞬時值更有參考價值）。但仿真裡不可能真跑 1 秒，
+所以測試台**另建一個 `CLK_FREQ = 2×(H_TOTAL×V_TOTAL)` 的實例**，窗口正好等於 2 個幀週期
+→ `fps` 應恆為 2，可精確斷言（比斷言 1 強，能排除「計數器卡住」的巧合）。
+
+資源：幾個飽和計數器，約 120 LUT / 100 FF，**0 BRAM**。
+P0 階段這些統計量還沒有下游消費者（UART 在 P1 才接），所以例化上加了
+`dont_touch` 把實例釘住，否則綜合器會整塊優化掉、`mark_debug` 抓不到東西；P1 之後可以拿掉。
+
 從紅藍版升級到綠色版：`python tools/patch_green.py`（可重複執行，已套用過）。
+
+## 18. 兩個「仿真過、實現掛」的坑（多驅動網路）
+
+xsim **容忍**同一個 reg 被多個 always 塊驅動（它自己挑一個，跑起來「看起來正常」），
+Vivado 則直接拒絕：
+
+```
+[Synth 8-6859] multi-driven net on pin u_armor_vision/u_chroma_hist/hgb[255][19] ...
+[DRC MDRV-1] Multiple Driver Nets: Net .../Q[0] has multiple drivers (99 more like this)
+[Vivado_Tcl 4-78] Error(s) found during DRC. Opt_design not run.
+```
+
+> 結論：**仿真全過 ≠ 能實現**。新增任何 always 塊之後，都要回頭確認自己寫的 reg 沒有第二個驅動源。
+
+### 兩處病灶
+
+| 檔案 | reg | 症狀 | 修法 |
+|------|-----|------|------|
+| `chroma_hist.v` | `hgr` / `hgb` / `total` | 直方圖「掃描時清零」與「工作時累加」各寫一次；`total` 也是兩塊都寫 | 寫口合成**單一寫埠**：`hist_we = scanning \| (de & ~scanning)`，`h_addr`/`h_addr_b` 用 mux 在掃描地址與像素地址間選，下一個值 `hgr_nx`/`hgb_nx` 也 mux 好，只留**一個**時序塊寫陣列；`total` 只由掃描 FSM 驅動 |
+| `osd_text.v` | `conv_done` | 轉換 FSM 裡置 1/清 0，數字刷新塊裡用完又清 0 | 只留 FSM 驅動，並改成單拍脈衝 `conv_done <= (cv_state == CV_SAVE) && (cv_sel == 2'd3);`；刷新塊**只讀不寫** |
+
+`osd_text.v` 的**復位分支**裡也有一行 `conv_done <= 1'b0;` —— 那是**同一塊內**的賦值，合法；
+刪的時候要連帶後一行 `nd0 <= ndig(b0_bcd);` 一起當錨點，否則會誤刪。
+
+腳本：`python tools/patch_fix_multidriver.py`（純 ASCII 錨點 + 回讀比對，可重複執行）。
+
+### 自查方法
+
+1. 每個時序塊寫的 reg，全域搜尋它一共出現幾次 `<=` 賦值；跨到 >1 個塊就是多驅動。
+2. 記憶體（陣列）最容易踩：「清零」與「累加」寫在**同一個** always 的兩個 `if` 裡是合法的，
+   寫在**兩個** always 裡就是多驅動。而且多寫埠還有第二個副作用 —— **擋掉 RAM 推断**（見 §7）。
+3. 最終驗收只能靠綜合：`vivado -mode batch -source tools/synth_check_vision.tcl -nojournal`，看 `ERROR` 數量為 0。
+
+### 順帶：`pin.xdc:49` 的警告
+
+```
+[Common 17-55] 'set_property' expects at least one object. [pin.xdc:49]
+```
+
+`set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets cam_pclk_IBUF]` 抓的是**自動推導出來的網名**，
+換版本/換綜合設定就可能抓不到。這是**專案既有**的警告，與本次改動無關，不影響實現。
+

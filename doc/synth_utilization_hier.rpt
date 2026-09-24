@@ -1,7 +1,7 @@
 Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
 -----------------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
-| Date         : Wed Sep 23 14:51:07 2026
+| Date         : Wed Sep 23 22:47:23 2026
 | Host         : EddieDuanLegionY7000P running 64-bit major release  (build 9200)
 | Command      : report_utilization -hierarchical -file C:/Users/DUANboyang/Desktop/FPGA4dart/doc/synth_utilization_hier.rpt
 | Design       : armor_vision
@@ -18,51 +18,62 @@ Table of Contents
 1. Utilization by Hierarchy
 ---------------------------
 
-+-----------------------------------+-------------------------------+------------+------------+---------+------+-----+--------+--------+------------+
-|              Instance             |             Module            | Total LUTs | Logic LUTs | LUTRAMs | SRLs | FFs | RAMB36 | RAMB18 | DSP Blocks |
-+-----------------------------------+-------------------------------+------------+------------+---------+------+-----+--------+--------+------------+
-| armor_vision                      |                         (top) |       3332 |       1218 |    2114 |    0 | 750 |      0 |      0 |          4 |
-|   (armor_vision)                  |                         (top) |         44 |         44 |       0 |    0 | 205 |      0 |      0 |          0 |
-|   u_color_seg                     |                     color_seg |         90 |         90 |       0 |    0 |   0 |      0 |      0 |          0 |
-|   u_dilate                        |                     morph_nxn |        182 |         78 |     104 |    0 |  72 |      0 |      0 |          0 |
-|     (u_dilate)                    |                     morph_nxn |         32 |         32 |       0 |    0 |  72 |      0 |      0 |          0 |
-|     gen_line_buf[0].u_line_buffer |                line_buffer_17 |         29 |         16 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[1].u_line_buffer |                line_buffer_18 |         17 |          4 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[2].u_line_buffer |                line_buffer_19 |         17 |          4 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[3].u_line_buffer |                line_buffer_20 |         16 |          3 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[4].u_line_buffer |                line_buffer_21 |         20 |          7 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[5].u_line_buffer |                line_buffer_22 |         17 |          4 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[6].u_line_buffer |                line_buffer_23 |         17 |          4 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[7].u_line_buffer |                line_buffer_24 |         17 |          4 |      13 |    0 |   0 |      0 |      0 |          0 |
-|   u_erode                         |     morph_nxn__parameterized0 |        176 |         72 |     104 |    0 |  72 |      0 |      0 |          0 |
-|     (u_erode)                     |     morph_nxn__parameterized0 |         41 |         41 |       0 |    0 |  72 |      0 |      0 |          0 |
-|     gen_line_buf[0].u_line_buffer |                   line_buffer |         18 |          5 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[1].u_line_buffer |                line_buffer_10 |         17 |          4 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[2].u_line_buffer |                line_buffer_11 |         17 |          4 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[3].u_line_buffer |                line_buffer_12 |         16 |          3 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[4].u_line_buffer |                line_buffer_13 |         16 |          3 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[5].u_line_buffer |                line_buffer_14 |         17 |          4 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[6].u_line_buffer |                line_buffer_15 |         16 |          3 |      13 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[7].u_line_buffer |                line_buffer_16 |         18 |          5 |      13 |    0 |   0 |      0 |      0 |          0 |
-|   u_overlay_box                   |                   overlay_box |         56 |         56 |       0 |    0 |   0 |      0 |      0 |          4 |
-|   u_proj_bond                     |                     proj_bond |        595 |        353 |     242 |    0 | 135 |      0 |      0 |          0 |
-|   u_seg_display                   |                   seg_display |         32 |         32 |       0 |    0 |  19 |      0 |      0 |          0 |
-|   u_video_delay                   |                   video_delay |       1999 |        335 |    1664 |    0 | 128 |      0 |      0 |          0 |
-|     (u_video_delay)               |                   video_delay |         69 |         69 |       0 |    0 | 128 |      0 |      0 |          0 |
-|     gen_line_buf[0].u_line_buffer |   line_buffer__parameterized0 |        241 |         33 |     208 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[1].u_line_buffer | line_buffer__parameterized0_3 |        240 |         32 |     208 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[2].u_line_buffer | line_buffer__parameterized0_4 |        240 |         32 |     208 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[3].u_line_buffer | line_buffer__parameterized0_5 |        240 |         32 |     208 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[4].u_line_buffer | line_buffer__parameterized0_6 |        240 |         32 |     208 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[5].u_line_buffer | line_buffer__parameterized0_7 |        240 |         32 |     208 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[6].u_line_buffer | line_buffer__parameterized0_8 |        240 |         32 |     208 |    0 |   0 |      0 |      0 |          0 |
-|     gen_line_buf[7].u_line_buffer | line_buffer__parameterized0_9 |        249 |         41 |     208 |    0 |   0 |      0 |      0 |          0 |
-|   u_vision_cfg                    |                    vision_cfg |        158 |        158 |       0 |    0 | 119 |      0 |      0 |          0 |
-|     (u_vision_cfg)                |                    vision_cfg |         63 |         63 |       0 |    0 |  27 |      0 |      0 |          0 |
-|     gen_key[0].u_key_debounce     |                  key_debounce |         17 |         17 |       0 |    0 |  23 |      0 |      0 |          0 |
-|     gen_key[1].u_key_debounce     |                key_debounce_0 |         45 |         45 |       0 |    0 |  23 |      0 |      0 |          0 |
-|     gen_key[2].u_key_debounce     |                key_debounce_1 |         16 |         16 |       0 |    0 |  23 |      0 |      0 |          0 |
-|     gen_key[3].u_key_debounce     |                key_debounce_2 |         17 |         17 |       0 |    0 |  23 |      0 |      0 |          0 |
-+-----------------------------------+-------------------------------+------------+------------+---------+------+-----+--------+--------+------------+
++-----------------------------------+--------------------------------+------------+------------+---------+------+------+--------+--------+------------+
+|              Instance             |             Module             | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs | RAMB36 | RAMB18 | DSP Blocks |
++-----------------------------------+--------------------------------+------------+------------+---------+------+------+--------+--------+------------+
+| armor_vision                      |                          (top) |       6397 |       3789 |    2608 |    0 | 2661 |      0 |      0 |         13 |
+|   (armor_vision)                  |                          (top) |        233 |        233 |       0 |    0 |  325 |      0 |      0 |          0 |
+|   u_blob_track                    |                     blob_track |       1361 |       1361 |       0 |    0 |  964 |      0 |      0 |          9 |
+|   u_chroma_hist                   |                    chroma_hist |        660 |        340 |     320 |    0 |  121 |      0 |      0 |          0 |
+|   u_dilate                        |                      morph_nxn |        181 |         77 |     104 |    0 |   72 |      0 |      0 |          0 |
+|     (u_dilate)                    |                      morph_nxn |         32 |         32 |       0 |    0 |   72 |      0 |      0 |          0 |
+|     gen_line_buf[0].u_line_buffer | line_buffer__parameterized0_19 |         24 |         11 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[1].u_line_buffer | line_buffer__parameterized0_20 |         19 |          6 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[2].u_line_buffer | line_buffer__parameterized0_21 |         18 |          5 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[3].u_line_buffer | line_buffer__parameterized0_22 |         17 |          4 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[4].u_line_buffer | line_buffer__parameterized0_23 |         16 |          3 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[5].u_line_buffer | line_buffer__parameterized0_24 |         18 |          5 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[6].u_line_buffer | line_buffer__parameterized0_25 |         20 |          7 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[7].u_line_buffer | line_buffer__parameterized0_26 |         17 |          4 |      13 |    0 |    0 |      0 |      0 |          0 |
+|   u_erode                         |      morph_nxn__parameterized0 |        181 |         77 |     104 |    0 |   72 |      0 |      0 |          0 |
+|     (u_erode)                     |      morph_nxn__parameterized0 |         36 |         36 |       0 |    0 |   72 |      0 |      0 |          0 |
+|     gen_line_buf[0].u_line_buffer |    line_buffer__parameterized0 |         16 |          3 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[1].u_line_buffer | line_buffer__parameterized0_12 |         18 |          5 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[2].u_line_buffer | line_buffer__parameterized0_13 |         23 |         10 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[3].u_line_buffer | line_buffer__parameterized0_14 |         17 |          4 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[4].u_line_buffer | line_buffer__parameterized0_15 |         16 |          3 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[5].u_line_buffer | line_buffer__parameterized0_16 |         18 |          5 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[6].u_line_buffer | line_buffer__parameterized0_17 |         18 |          5 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[7].u_line_buffer | line_buffer__parameterized0_18 |         19 |          6 |      13 |    0 |    0 |      0 |      0 |          0 |
+|   u_median                        |                      median3x3 |        905 |        489 |     416 |    0 |  112 |      0 |      0 |          0 |
+|     (u_median)                    |                      median3x3 |        239 |        239 |       0 |    0 |  112 |      0 |      0 |          0 |
+|     u_lb0                         |                 line_buffer_10 |        325 |        117 |     208 |    0 |    0 |      0 |      0 |          0 |
+|     u_lb1                         |                 line_buffer_11 |        341 |        133 |     208 |    0 |    0 |      0 |      0 |          0 |
+|   u_osd                           |                       osd_text |        246 |        246 |       0 |    0 |  261 |      0 |      0 |          0 |
+|   u_overlay_box                   |                    overlay_box |        100 |        100 |       0 |    0 |    0 |      0 |      0 |          4 |
+|   u_reg_file                      |                       reg_file |         70 |         70 |       0 |    0 |   47 |      0 |      0 |          0 |
+|   u_result_frame                  |                   result_frame |         80 |         80 |       0 |    0 |  122 |      0 |      0 |          0 |
+|     (u_result_frame)              |                   result_frame |         53 |         53 |       0 |    0 |   91 |      0 |      0 |          0 |
+|     u_tx                          |                        uart_tx |         27 |         27 |       0 |    0 |   31 |      0 |      0 |          0 |
+|   u_seg_display                   |                    seg_display |         61 |         61 |       0 |    0 |   19 |      0 |      0 |          0 |
+|   u_uart_rx                       |                        uart_rx |         34 |         34 |       0 |    0 |   40 |      0 |      0 |          0 |
+|   u_video_delay                   |                    video_delay |       1986 |        322 |    1664 |    0 |  128 |      0 |      0 |          0 |
+|     (u_video_delay)               |                    video_delay |         56 |         56 |       0 |    0 |  128 |      0 |      0 |          0 |
+|     gen_line_buf[0].u_line_buffer |                    line_buffer |        241 |         33 |     208 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[1].u_line_buffer |                  line_buffer_3 |        240 |         32 |     208 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[2].u_line_buffer |                  line_buffer_4 |        240 |         32 |     208 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[3].u_line_buffer |                  line_buffer_5 |        240 |         32 |     208 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[4].u_line_buffer |                  line_buffer_6 |        240 |         32 |     208 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[5].u_line_buffer |                  line_buffer_7 |        240 |         32 |     208 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[6].u_line_buffer |                  line_buffer_8 |        242 |         34 |     208 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[7].u_line_buffer |                  line_buffer_9 |        247 |         39 |     208 |    0 |    0 |      0 |      0 |          0 |
+|   u_vision_cfg                    |                     vision_cfg |        101 |        101 |       0 |    0 |  119 |      0 |      0 |          0 |
+|     (u_vision_cfg)                |                     vision_cfg |          5 |          5 |       0 |    0 |   27 |      0 |      0 |          0 |
+|     gen_key[0].u_key_debounce     |                   key_debounce |         17 |         17 |       0 |    0 |   23 |      0 |      0 |          0 |
+|     gen_key[1].u_key_debounce     |                 key_debounce_0 |         44 |         44 |       0 |    0 |   23 |      0 |      0 |          0 |
+|     gen_key[2].u_key_debounce     |                 key_debounce_1 |         18 |         18 |       0 |    0 |   23 |      0 |      0 |          0 |
+|     gen_key[3].u_key_debounce     |                 key_debounce_2 |         17 |         17 |       0 |    0 |   23 |      0 |      0 |          0 |
+|   u_vision_stat                   |                    vision_stat |        200 |        200 |       0 |    0 |  259 |      0 |      0 |          0 |
++-----------------------------------+--------------------------------+------------+------------+---------+------+------+--------+--------+------------+
 
 

@@ -23,6 +23,8 @@ module ov5640_lcd(
     output     [7:0]      seg_led      ,  //数码管段码(低电平点亮)
     input                 sys_clk      ,  //系统时钟
     input                 sys_rst_n    ,  //系统复位，低电平有效
+    input                 uart_rxd     ,  //板载 USB-UART 接收（PC -> FPGA）
+    output                uart_txd     ,  //板载 USB-UART 发送（FPGA -> PC）
     //摄像头接口                       
     input                 cam_pclk     ,  //cmos数据像素时钟
     input                 cam_vsync    ,  //cmos场同步信号
@@ -238,6 +240,13 @@ armor_vision u_armor_vision(
     .seg_led    (seg_led          ),//数码管段码
     .bond_valid (vision_bond_valid),//检测结果
     .center_x   (vision_cx        ),
-    .center_y   (vision_cy        )
+    .center_y   (vision_cy        ),
+    //  UART（P1 结果上报 / P2 参数写入）—— 这里先不接引脚：
+    //  板上 USB-UART 的引脚要按实际接线再定；现在加顶层端口 + 未约束引脚，
+    //  实现阶段会变成一堆 unconstrained IO 的麻烦。
+    //  rxd 固定 1 -> 永远收不到数据 -> 寄存器保持工程默认值，行为与改动前一致。
+    //  txd 悬空 -> 综合会把 UART 发送链优化掉（要用就在 pin.xdc 里约束后再引到顶层）。
+    .uart_rxd   (uart_rxd         ),
+    .uart_txd   (uart_txd         )
 );
 endmodule

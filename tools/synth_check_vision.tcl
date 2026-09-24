@@ -32,6 +32,17 @@ read_verilog [list \
     $rtl/overlay_box.v \
     $rtl/seg_display.v \
     $rtl/vision_cfg.v \
+    $rtl/median3x3.v \
+    $rtl/blob_track.v \
+    $rtl/track_ab.v \
+    $rtl/chroma_hist.v \
+    $rtl/vision_stat.v \
+    $rtl/uart_tx.v \
+    $rtl/uart_rx.v \
+    $rtl/result_frame.v \
+    $rtl/reg_file.v \
+    $rtl/aec_loop.v \
+    $rtl/osd_text.v \
     $rtl/armor_vision.v ]
 
 synth_design -top armor_vision -part xc7a35tfgg484-2 -mode out_of_context

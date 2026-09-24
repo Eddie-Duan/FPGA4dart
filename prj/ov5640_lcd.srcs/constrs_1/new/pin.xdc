@@ -5,6 +5,11 @@ set_property IOSTANDARD LVCMOS33 [get_ports sys_clk]
 set_property IOSTANDARD LVCMOS33 [get_ports sys_rst_n]
 set_property PACKAGE_PIN U2 [get_ports sys_rst_n]
 
+#UART（板载 USB-UART：P1 结果上报 / P2 参数写入）
+#  引脚取自《达芬奇开发板IO引脚分配表》：uart_rxd=U5、uart_txd=T6
+set_property -dict {PACKAGE_PIN U5 IOSTANDARD LVCMOS33} [get_ports uart_rxd]
+set_property -dict {PACKAGE_PIN T6 IOSTANDARD LVCMOS33} [get_ports uart_txd]
+
 #RGB LCD
 set_property -dict {PACKAGE_PIN R16 IOSTANDARD LVCMOS33} [get_ports {lcd_rgb[0]}]
 set_property -dict {PACKAGE_PIN P15 IOSTANDARD LVCMOS33} [get_ports {lcd_rgb[1]}]

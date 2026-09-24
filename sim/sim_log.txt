@@ -1,0 +1,78 @@
+---- compile ----
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/line_buffer.v" into library work
+INFO: [VRFC 10-311] analyzing module line_buffer
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/key_debounce.v" into library work
+INFO: [VRFC 10-311] analyzing module key_debounce
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/color_seg.v" into library work
+INFO: [VRFC 10-311] analyzing module color_seg
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/morph_nxn.v" into library work
+INFO: [VRFC 10-311] analyzing module morph_nxn
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/video_delay.v" into library work
+INFO: [VRFC 10-311] analyzing module video_delay
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/proj_bond.v" into library work
+INFO: [VRFC 10-311] analyzing module proj_bond
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/overlay_box.v" into library work
+INFO: [VRFC 10-311] analyzing module overlay_box
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/seg_display.v" into library work
+INFO: [VRFC 10-311] analyzing module seg_display
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/vision_cfg.v" into library work
+INFO: [VRFC 10-311] analyzing module vision_cfg
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/median3x3.v" into library work
+INFO: [VRFC 10-311] analyzing module median3x3
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/blob_track.v" into library work
+INFO: [VRFC 10-311] analyzing module blob_track
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/track_ab.v" into library work
+INFO: [VRFC 10-311] analyzing module track_ab
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/chroma_hist.v" into library work
+INFO: [VRFC 10-311] analyzing module chroma_hist
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/vision_stat.v" into library work
+INFO: [VRFC 10-311] analyzing module vision_stat
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/uart_tx.v" into library work
+INFO: [VRFC 10-311] analyzing module uart_tx
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/uart_rx.v" into library work
+INFO: [VRFC 10-311] analyzing module uart_rx
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/result_frame.v" into library work
+INFO: [VRFC 10-311] analyzing module result_frame
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/reg_file.v" into library work
+INFO: [VRFC 10-311] analyzing module reg_file
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/aec_loop.v" into library work
+INFO: [VRFC 10-311] analyzing module aec_loop
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/osd_text.v" into library work
+INFO: [VRFC 10-311] analyzing module osd_text
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/armor_vision.v" into library work
+INFO: [VRFC 10-311] analyzing module armor_vision
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/sim/tb_armor_vision.v" into library work
+INFO: [VRFC 10-311] analyzing module tb_armor_vision
+---- elaborate ----
+Vivado Simulator 2020.2
+Copyright 1986-1999, 2001-2020 Xilinx, Inc. All Rights Reserved.
+Running: D:/Xilinx/Vivado/2020.2/bin/unwrapped/win64.o/xelab.exe -debug typical tb_armor_vision -s tb_vision 
+Multi-threading is on. Using 30 slave threads.
+Starting static elaboration
+Pass Through NonSizing Optimizer
+Completed static elaboration
+Starting simulation data flow analysis
+Completed simulation data flow analysis
+Time Resolution for simulation is 1ps
+Compiling module work.key_debounce_default
+Compiling module work.vision_cfg_default
+Compiling module work.uart_rx_default
+Compiling module work.reg_file
+Compiling module work.line_buffer(DW=16)
+Compiling module work.median3x3
+Compiling module work.chroma_hist
+Compiling module work.color_seg
+Compiling module work.line_buffer
+Compiling module work.morph_nxn_default
+Compiling module work.video_delay_default
+Compiling module work.blob_track_default
+Compiling module work.track_ab_default
+Compiling module work.overlay_box_default
+Compiling module work.osd_text
+Compiling module work.aec_loop
+Compiling module work.uart_tx_default
+Compiling module work.result_frame
+Compiling module work.vision_stat
+Compiling module work.seg_display_default
+Compiling module work.armor_vision_default
+Compiling module work.tb_armor_vision
