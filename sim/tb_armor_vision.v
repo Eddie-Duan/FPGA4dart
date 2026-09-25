@@ -411,10 +411,35 @@ ballistic #(.AW(10), .WIDTH(800), .HEIGHT(480)) u_bal_test (
     .dist_ok    (bl_ok_t  )
 );
 
+//  ---- P12 多帧累积单测（8x4 小尺寸，清空只要 32 拍）----
+reg         ta2_de   = 1'b0;
+reg  [2:0]  ta2_x    = 3'd0;
+reg  [2:0]  ta2_y    = 3'd0;
+reg         ta2_mask = 1'b0;
+reg         ta2_clr  = 1'b0;
+wire [2:0]  ta2_xo, ta2_yo;
+wire        ta2_deo, ta2_masko;
+
+temporal_acc #(.WIDTH(8), .HEIGHT(4), .AW(3)) u_tacc_test (
+    .clk     (clk      ),
+    .rst_n   (rst_n    ),
+    .de      (ta2_de   ),
+    .x       (ta2_x    ),
+    .y       (ta2_y    ),
+    .mask_in (ta2_mask ),
+    .en      (1'b1     ),
+    .thr     (2'd2    ),
+    .clr     (ta2_clr  ),
+    .x_o     (ta2_xo   ),
+    .y_o     (ta2_yo   ),
+    .de_o    (ta2_deo  ),
+    .mask_o  (ta2_masko)
+);
+
 //  115200 @ 25MHz = 217 拍/位；起始位下降沿后等 1.5 位再每 217 拍采一次
 localparam integer UART_DIV = 217;
-reg  [7:0]  ur_b [0:33];
-reg  [5:0]  ur_n    = 6'd0;
+reg  [7:0]  ur_b [0:67];   // 收两帧（34x2）：第二帧验序号递增与 CRC
+reg  [6:0]  ur_n    = 7'd0;
 reg         ur_act  = 1'b0;
 reg         ur_done = 1'b0;
 reg  [15:0] ur_wait = 16'd0;
@@ -422,9 +447,33 @@ reg  [3:0]  ur_bs   = 4'd0;
 reg  [7:0]  ur_sh   = 8'd0;
 integer     uk;
 
+//  ---- P12: 软件 CRC16/CCITT-FALSE，用来和硬件 CRC 对拍 ----
+//  把 byte2..byte31 拼成 240 bit 逐位算；这样不依赖「第一帧 seq 一定是 0」的假设，
+//  也能顺带指出「收到的字节序/覆盖范围」是否有错。
+integer      uk2;
+wire [239:0] ur_pay1 = { ur_b[2], ur_b[3], ur_b[4], ur_b[5], ur_b[6], ur_b[7], ur_b[8], ur_b[9], ur_b[10], ur_b[11], ur_b[12], ur_b[13], ur_b[14], ur_b[15], ur_b[16], ur_b[17], ur_b[18], ur_b[19], ur_b[20], ur_b[21], ur_b[22], ur_b[23], ur_b[24], ur_b[25], ur_b[26], ur_b[27], ur_b[28], ur_b[29], ur_b[30], ur_b[31] };
+wire [239:0] ur_pay2 = { ur_b[36], ur_b[37], ur_b[38], ur_b[39], ur_b[40], ur_b[41], ur_b[42], ur_b[43], ur_b[44], ur_b[45], ur_b[46], ur_b[47], ur_b[48], ur_b[49], ur_b[50], ur_b[51], ur_b[52], ur_b[53], ur_b[54], ur_b[55], ur_b[56], ur_b[57], ur_b[58], ur_b[59], ur_b[60], ur_b[61], ur_b[62], ur_b[63], ur_b[64], ur_b[65] };
+wire [15:0]  ur_c1   = { ur_b[32], ur_b[33] };
+wire [15:0]  ur_c2   = { ur_b[66], ur_b[67] };
+
+function [15:0] crc16_sw;
+    input [239:0] dat;
+    integer       i;
+    reg   [15:0]  c;
+    reg           msb;
+    begin
+        c = 16'hFFFF;
+        for(i = 239; i >= 0; i = i - 1) begin
+            msb = c[15] ^ dat[i];
+            c   = {c[14:0], 1'b0} ^ (msb ? 16'h1021 : 16'h0000);
+        end
+        crc16_sw = c;
+    end
+endfunction
+
 always @(posedge clk or negedge rst_n) begin
     if(!rst_n) begin
-        ur_act <= 1'b0; ur_done <= 1'b0; ur_n <= 6'd0;
+        ur_act <= 1'b0; ur_done <= 1'b0; ur_n <= 7'd0;
         ur_wait <= 16'd0; ur_bs <= 4'd0; ur_sh <= 8'd0;
     end
     else if(!ur_act) begin
@@ -442,10 +491,10 @@ always @(posedge clk or negedge rst_n) begin
             ur_wait <= 16'd216;                    // 每 217 拍一位
         end
         else begin                                 // 停止位 -> 收完一个字节
-            if(ur_n < 6'd34) begin
+            if(ur_n < 7'd68) begin
                 ur_b[ur_n] <= ur_sh;
-                ur_n <= ur_n + 6'd1;
-                if(ur_n == 6'd33) ur_done <= 1'b1;  // 第一帧收满 34 字节就冻结
+                ur_n <= ur_n + 7'd1;
+                if(ur_n == 7'd67) ur_done <= 1'b1;  // 收满两帧（68 字节）就冻结
             end
             ur_act <= 1'b0;
         end
@@ -614,6 +663,21 @@ task bl_frame;
         @(negedge clk);
         bl_vsync = 1'b0;
         repeat(4) @(posedge clk);
+    end
+endtask
+
+//  给多帧累积单测喂一个像素：de 只拉高 1 拍，2 拍后看输出（BRAM 同步读 1 拍 + 判据 1 拍）
+task ta2_px;
+    input [2:0] px;
+    input [2:0] py;
+    input       pm;
+    begin
+        @(negedge clk);
+        ta2_x = px; ta2_y = py; ta2_mask = pm; ta2_de = 1'b1;
+        @(negedge clk);
+        ta2_de = 1'b0;
+        @(posedge clk);       // 像素在这个正沿被采样（读出 + 判据）
+        @(negedge clk);       // 半个周期后读结果，避开与正沿的竞争
     end
 endtask
 
@@ -831,7 +895,7 @@ initial begin
     //=====================================================
     wait(ur_done);
     repeat(20) @(posedge clk);
-    chk("uart_nbytes", {26'd0, ur_n}, 32'd34);
+    chk("uart_nbytes", {25'd0, ur_n}, 32'd68);
     chk("uart_hdr0",   {24'd0, ur_b[0]},  32'hA5);
     chk("uart_hdr1",   {24'd0, ur_b[1]},  32'h5A);
     chk("uart_flags",  {24'd0, ur_b[2]},  32'hBB);   // 扩展帧+dist_ok+pred+moving+adapt+valid
@@ -850,9 +914,18 @@ initial begin
     chk("uart_drop",   ({22'b0, ur_b[25]} << 8) | {24'd0, ur_b[26]}, 32'd159);
     chk("uart_fx",     ({22'b0, ur_b[27]} << 8) | {24'd0, ur_b[28]}, 32'd408);
     chk("uart_fy",     ({22'b0, ur_b[29]} << 8) | {24'd0, ur_b[30]}, 32'd178);
-    chk("uart_seq",    {24'd0, ur_b[31]}, 32'd0);     // 第一帧序号 = 0
-    chk("uart_crc",    ({22'b0, ur_b[32]} << 8) | {24'd0, ur_b[33]}, 32'h8B12);
-    //  CRC 期望值是 Python 独立算的（不是从收到的数据反推）
+    //  帧序号：监视器抓到的第一帧未必是上电后第 0 帧，所以验「第二帧 = 第一帧 + 1」
+    chk("uart_seq_inc", ({24'd0, ur_b[65]} - {24'd0, ur_b[31]}) & 32'hFF, 32'd1);
+    chk("uart2_hdr0",   {24'd0, ur_b[34]}, 32'hA5);
+    chk("uart2_hdr1",   {24'd0, ur_b[35]}, 32'h5A);
+    //  CRC 用软件 CRC 对拍（覆盖 byte2..byte31），两帧都验
+    chk("uart_crc_sw",  {16'd0, crc16_sw(ur_pay1)}, {16'd0, ur_c1});
+    chk("uart2_crc_sw", {16'd0, crc16_sw(ur_pay2)}, {16'd0, ur_c2});
+    $write("  raw_frame1:");
+    for(uk2 = 0; uk2 < 34; uk2 = uk2 + 1) $write(" %02x", ur_b[uk2]);
+    $write("\n  raw_frame2:");
+    for(uk2 = 34; uk2 < 68; uk2 = uk2 + 1) $write(" %02x", ur_b[uk2]);
+    $write("\n");
 
     //=====================================================
     //=====================================================
@@ -885,6 +958,37 @@ initial begin
     chk("main_dist_ok", {31'b0, u_armor_vision.bl_ok}, 32'd1);
     chk_range("main_dist", u_armor_vision.bl_dist_cm, 32'd69, 32'd72);
     chk_range("main_drop", u_armor_vision.bl_drop_px, 32'd21, 32'd23);
+
+    //=====================================================
+    $display("---- phase 14 : temporal_acc (P12) unit test ----");
+    //=====================================================
+    repeat(60) @(posedge clk);          // 等自动清空走完（8x4 = 32 拍）
+    //  同一个像素：(2,1) 连亮两帧 -> acc=2 -> 被留下
+    ta2_px(3'd2, 3'd1, 1'b1);
+    chk("tacc_hit1", {31'b0, ta2_masko}, 32'd0);   // 只亮 1 帧：还不够
+    ta2_px(3'd2, 3'd1, 1'b1);
+    chk("tacc_hit2", {31'b0, ta2_masko}, 32'd1);   // 连中两帧：粘住
+    chk("tacc_align_x", {29'd0, ta2_xo}, 32'd2);   // 坐标要跟着一起延 2 拍
+    chk("tacc_align_y", {29'd0, ta2_yo}, 32'd1);
+    chk("tacc_align_de", {31'b0, ta2_deo}, 32'd1);
+    //  灯走了：一帧不亮 -> acc 回到 1 -> 又判为没有
+    ta2_px(3'd2, 3'd1, 1'b0);
+    chk("tacc_decay", {31'b0, ta2_masko}, 32'd0);
+    //  噪声：另一个像素只亮 1 帧 -> 必须被拒绝（不会被攒成假目标）
+    ta2_px(3'd5, 3'd2, 1'b1);
+    chk("tacc_noise", {31'b0, ta2_masko}, 32'd0);
+    chk("tacc_noise_x", {29'd0, ta2_xo}, 32'd5);
+    //  再补一帧（(2,1) 第 3 次命中）：说明上一步「不亮」真的写回内存了
+    ta2_px(3'd2, 3'd1, 1'b1);
+    chk("tacc_persist", {31'b0, ta2_masko}, 32'd1);
+    //  软件强制清零（0x0C bit7）：整块 RAM 真的被清掉，而不是只旁路一拍
+    @(negedge clk); ta2_clr = 1'b1;
+    @(negedge clk); ta2_clr = 1'b0;
+    repeat(60) @(posedge clk);      // 8x4 = 32 拍清完
+    ta2_px(3'd2, 3'd1, 1'b1);
+    chk("tacc_clr_wipe", {31'b0, ta2_masko}, 32'd0);   // 清零前 acc=2
+    ta2_px(3'd2, 3'd1, 1'b1);
+    chk("tacc_clr_rehit", {31'b0, ta2_masko}, 32'd1);
 
     if(err_cnt == 32'd0)
         $display("==== ALL CHECKS PASSED ====");

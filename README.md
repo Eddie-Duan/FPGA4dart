@@ -20,6 +20,14 @@ measures already carry the anti-glare duty on their own.
 Built on top of the ALIENTEK (正点原子) Da Vinci **XC7A35T** example project *39_ov5640_lcd*
 (`OV5640 → DDR3 frame buffer → RGB LCD`).
 
+On top of the segmentation core, the pipeline now carries a small stack of PL-side features that
+the dart PL does not have: a **two-tier area gate** (P9) so a distant lamp is still recognised,
+**α-β velocity lead prediction** (P10), **ballistic distance / drop compensation** derived from the
+apparent lamp width (P11 — two 1/w lookup tables, zero divide; plus a **34-byte UART frame with a
+sequence number and CRC-16**), and **optional multi-frame temporal accumulation** (P12, a 2-bit
+saturating per-pixel counter that rejects single-frame dropouts and single-frame noise — **off by
+default**, and a zero-latency pass-through when off).
+
 ```
 OV5640 (RGB565 800×480) → DDR3 ping-pong buffer → [ green seg → morphology → dual projection → overlay ] → LCD
                                                                                     └→ 6-digit 7-seg
@@ -31,9 +39,9 @@ OV5640 (RGB565 800×480) → DDR3 ping-pong buffer → [ green seg → morpholog
 | **Camera** | OV5640, RGB565, 800×480 |
 | **Display** | 4.3" RGB LCD, 800×480, pixel clock 25 MHz (1:1, no scaling) |
 | **Tool** | Vivado 2020.2 |
-| **Verification** | `xsim` self-checking testbench — **90 checks, `ALL CHECKS PASSED`** (28 added in this round: far/small target, velocity-lead prediction, UART v2 frame) |
-| **Synthesis** | 0 errors / 0 warnings / 0 latches (after P9/P10) — LUT 7326 (35.2%), FF 2838 (6.8%), LUTRAM 2608, DSP 21, BRAM 0 |
-| **Timing** | `clk_out2` (50 MHz) is the tight domain; the P9 blob-selection chain missed it by 5.2 ns and is now split into a 3-stage pipeline (frame-static data) — see doc §19 |
+| **Verification** | `xsim` self-checking testbench — **126 checks, `ALL CHECKS PASSED`** (P12 added a 9-check accumulator phase + two-frame UART verification with an *in-testbench software CRC*; a seconds-long standalone unit test for the accumulator ships as `sim/tb_tacc.v`) |
+| **Synthesis** | 0 errors / 0 warnings / 0 latches — LUT 7488 (36.0%), FF 3237 (7.8%), LUTRAM 2608, DSP 24, **BRAM 24 RAMB36 (48% of 50)** |
+| **Timing** | `clk_out2` (50 MHz) is the tight domain; the P9 blob-selection chain missed it by 5.2 ns and is now split into a 3-stage pipeline (frame-static data) — see doc §19. Out-of-context pre-check now reports WNS **+6.64 ns** |
 | **Reference** | color test from the dart2026 open-source FPGA IP (`Threshold.v`); fixed-exposure approach from its `hikrobot.cpp` |
 | **License** | MIT (see [LICENSE](LICENSE)) |
 
@@ -96,6 +104,7 @@ LEDs: `led[0..2]` which threshold is selected · `led[3]` target detected (solid
 | **远处小灯也认**（P9） | `blob_track` 改成**两级面积门槛**：严档 400 像素（近/大目标）优先；没有严档时，只要面积 ≥ `min_area_lo`（默认 **8**，UART `0x04` 运行时可调）且长宽比 ≤ 8:1、填充率 ≥ 1/4 就接受。**修复「绿灯拉远后屏幕上有高亮却识别不到目标」**；`min_area_lo = 0` 可一键回到旧行为 |
 | **速度预测 / 提前量**（P10） | `aim_predict`：用最近几帧灯心做 α-β 速度估计（Q4，px/帧），外推 `LEAD_Q4` 帧（默认 4.0 帧 ≈ 133ms@30fps，UART `0x0A` 可调）→ 输出**预测灯心**，直接给云台打提前量。走 `raw_*` 路径**不加延迟**；静止目标下与不预测逐位一致。LCD 上黄色十字 = 预测瞄准点（只在目标在动时画） |
 | **距离 + 弹道下坠**（P11） | `ballistic`：由表观宽度反推距离与下坠（推导后**两者都只是 1/w**，两张 256 项表搞定，零除法/零乘法）。输出 `dist_cm` / `drop_px` / **最终瞄准点 `fx,fy`**（预测灯心 + 几何偏移 + 下坠补偿）——**云台直接用它**。弹速不用重新综合：UART `0x0B` 写 DROP_SCALE |
+| **多帧累积提灵敏度**（P12） | `temporal_acc`：800×480×2bit 块 RAM 的 **2 bit 饱和计数器** —— 命中 +1、未命中 -1（饱和），`acc >= thr`（默认 2）才算亮。把「连续几帧都亮」的真目标粘住（中间丢一帧也不掉），单帧噪点只到 1 就被拒绝。输出延 2 拍，`x/y/de` 同步延 2 拍对齐；**默认关闭**（关闭时零延迟直通，行为与不加完全相同）。约需 21~22 个 RAMB36 |
 | **自适应阈值**（P5） | `chroma_hist`：每帧统计 `G-R` / `G-B` 的 256 bin 直方图，帧末取分位数当阈值（默认「色度最高的 15% 像素」），阈值自动跟着距离 / 光照走。**dart 也没有这个**（它靠 PS 写寄存器） |
 | **曝光闭环**（P6） | `aec_loop`：统计过曝（三通道同时 >200）像素比例，超上限就降曝光、低于下限就升曝光，带死区与速率限制。**这是对「手猜曝光导致黑屏」的正确修复**；默认关闭 |
 | **中值预滤波**（P7） | `median3x3`：分离式 3×3 中值，二值化前压强噪声。默认关闭（关闭时零延迟） |
@@ -187,9 +196,18 @@ cd sim
 # 等同于： xvlog <设计文件...> ; xelab -debug typical tb_armor_vision -s tb_vision ; xsim tb_vision -runall
 ```
 
+> **改单个模块时用秒级单测**：`sim/tb_tacc.v` 只例化 `temporal_acc`（8×4 小尺寸）+ 稀疏像素流，
+> 9 项自检，`xvlog + xelab + xsim` **5 秒** 跑完（主测试台一轮要 8~10 分钟）。
+> 本轮就是靠它抓出累积器“写地址错一拍”的 bug，详见 `doc/vision_pipeline.md` §22。
+
+```powershell
+cd sim
+xvlog ..\rtl\temporal_acc.v tb_tacc.v ; xelab -debug typical tb_tacc -s tacc_snap ; xsim tacc_snap -runall
+```
+
 测试台造出与 `lcd_driver`（800×480 面板）**完全相同**的时序，图像为
 **一个绿色实心圆**（圆心 (400,240)、半径 100、`RGB565 = 0x750E` → `r8=118 g8=162 b8=118`，
-即 `G-R = G-B = 44`），并验证 **44 项**：
+即 `G-R = G-B = 44`），并验证 **126 项**（下表为相位 1~2 的 44 项明细，其余见 `doc/vision_pipeline.md` §11）：
 
 | 阶段 | 检查 | 期望 | 说明 |
 |---|---|---|---|
@@ -212,7 +230,7 @@ cd sim
 | 6 | `sel` | 2 | 再按 `key[0]` 一次 → 选中项切到 `TH_G-B` |
 | 7 | `disp_bin` / `bin_white` | 1 / `0xFFFF` | 按 `key[3]` → 纯二值模式，圆内显示白色 |
 
-实测输出：`==== ALL CHECKS PASSED ====`（44 项）。
+实测输出：`==== ALL CHECKS PASSED ====`（14 个相位共 126 项；`sim/tb_tacc.v` 另有 11 项秒级单测）。
 
 > **阶段 2 是关键回归**：旧版「取最长连续 run」的投影在这里会退化成
 > `h≈84`、`center_y≈190`（框只剩上半边）—— 那就是「转一点角度就识别不到」的现场。
@@ -361,9 +379,13 @@ $$1.449\,W \;\le\; c_y \;\le\; 479 - W/2 \quad\Longrightarrow\quad W \le 245\tex
 | `overlay_box`（圆环两个平方 + 十字） | 56 | 0 | 0 | 4 |
 | `seg_display` | 32 | 0 | 19 | 0 |
 | 顶层与显示合成 | 44 | 0 | 205 | 0 |
-| **合计** | **3332（16.0%）** | 2114 | **750（1.8%）** | **4（4.4%）** |
+| **合计** | **7488（36.0%）** | 2608 | **3237（7.8%）** | **24（26.7%）** |
 
-Block RAM 0。原 39 例程（DDR3 MIG + FIFO + 相机 + LCD）的资源仍然充裕。
+> 上表各模块数字是 P3 之前的旧值（已过期，保留作对照）；**当前实测**见这一行：
+> **`armor_vision` OOC 合计 LUT 7488（36.0%）/ FF 3237（7.8%）/ DSP 24（26.7%）/ LUTRAM 2608**，
+> 其中 **Block RAM 24 个 RAMB36（48%）—— 全部来自 P12 的 `temporal_acc`**（其余模块仍推给 LUTRAM）。
+> 7A35T 共 50 个 RAMB36：24（累积器）+ 原 39 例程的两条视频 FIFO，能装下但余量不宽裕；
+> 不够时把 `acc_mem` 改成 1 bit 即可减半（12 个）。
 完整报告：`doc/synth_utilization_vision.rpt`、`doc/synth_utilization_hier.rpt`。
 
 > **踩过的坑（很重要）**：一开始把行缓冲写成 `reg [WW-1:0] buf [0:NL-1][0:WIDTH-1]`，
@@ -455,6 +477,8 @@ Copy-Item _backup_before_vision\ov5640_lcd.xpr.bak prj\ov5640_lcd.xpr -Force
 | `patch_blob_timing.py` | 修 50MHz 下的 setup 违例：把 `blob_track` 的选块 + 几何换算拆成三级流水（数据帧内准静态，拆开对功能零影响） |
 | `timing_peek.py` + `timing_peek.tcl` | 时序诊断：从报告抽重点 / 在 routed checkpoint 上列出所有 slack < 1ns 的路径（summary 只给最差 10 条） |
 | `patch_p11_*.py` + `gen_ballistic_lut.py` + `patch_result_frame_v3.py` | P11：距离/下坠补偿（1/w 查表）、上报帧 v3（34 字节 + CRC16 + 帧序号）、把 `RING_T/GATE/ADAPT_PCT` 改成运行时端口 |
+| `patch_p12_tacc.py` + `patch_p12_tb.py` + `patch_p12_fix.py` | P12：多帧累积（新增 `rtl/temporal_acc.v`，2 bit 饱和计数器）、`reg_file` 新增 `0x0C`、测试台相位 14 与 UART **两帧**核对（序号递增 + testbench 侧软件 CRC 对拍） |
+| `fix_tb_dump.py` | 修上一个补丁留下的坑：`re.sub` 会把替换串里的 `\n` 当换行展开，改成 `str.replace`（写 Verilog 字符串字面量时注意） |
 | `tb_probe.v`（在 `sim/`） | 快速探针：只跑 5 帧，打印显示通路各级与**实例内部端口**，20 秒定位 X 扩散（比主测试台 8 分钟快得多） |
 | `model_morph.py` | 视觉管线的 Python 参考模型：验证期望值是怎么来的、试算反光下的行为（不需要综合、不被 xsim 用到） |
 | `to_gbk.py` | 新增文件的中文注释 UTF-8 → GBK（与工程其他文件一致） |
@@ -469,6 +493,9 @@ Copy-Item _backup_before_vision\ov5640_lcd.xpr.bak prj\ov5640_lcd.xpr -Force
   若存成 UTF-8，Vivado 内置编辑器看到的中文注释会变乱码。
 - 要**批量改 GBK 文件**不要用普通编辑器保存，请照 `tools/patch_green.py` 的做法
   用 Python（GBK 解码 → 改 → GBK 编码，写回前往返比对）或纯 ASCII 字节级替换。
+- **别用「猜编码」的自动转换**：把 UTF-8 文件当 GBK 读、再写回 UTF-8 会产生 **U+FFFD 替换字符**，中文注释**不可逆损坏**
+  （本仓库 `rtl/reg_file.v`、`rtl/osd_text.v` 的注释在历史提交里就已经是这样坏的，`rtl/temporal_acc.v` 也中过一次、已重建）。
+  转码只能单向一次：**UTF-8 读 → GBK 写**，写完立刻回读比对。
 
 ### 14. 授权与致谢
 
@@ -500,6 +527,7 @@ Copy-Item _backup_before_vision\ov5640_lcd.xpr.bak prj\ov5640_lcd.xpr -Force
 | 遠處小燈也認（P9） | `blob_track` **兩級面積門檻**：嚴檔 400 像素優先；沒有嚴檔時只要面積 ≥ `min_area_lo`（預設 **8**，UART `0x04` 可調）且長寬比 ≤ 8:1、填充率 ≥ 1/4 就接受。修復「綠燈拉遠後螢幕上有高亮卻認不到目標」 |
 | 速度預測 / 提前量（P10） | `aim_predict`：α-β 速度估計（Q4，px/幀）外推 `LEAD_Q4` 幀（預設 4.0 幀 ≈ 133ms@30fps）→ 預測燈心，給雲台打提前量；走 `raw_*` 不加延遲，靜止目標下與不預測逐位一致 |
 | 距離 + 彈道下墜（P11） | `ballistic`：由表觀寬度反推距離與下墜（化簡後**兩者都只是 1/w**，兩張 256 項表，零除法/零乘法）→ `dist_cm` / `drop_px` / **最終瞄準點 `fx,fy`**；彈速用 UART `0x0B` 在線修正 |
+| 多幀累積提靈敏度（P12） | `temporal_acc`：800×480×2bit 塊 RAM 的 **2 bit 飽和計數器** —— 命中 +1、未命中 -1（飽和），`acc >= thr`（預設 2）才算亮。把「連續幾幀都亮」的真目標黏住（中間丟一幀也不掉），單幀雜點只到 1 就被拒絕。輸出延 2 拍，`x/y/de` 同步延 2 拍對齊；**預設關閉**（關閉時零延遲直通，行為與不加完全相同）。約需 21~22 個 RAMB36 |
 | 自適應閾值（P5） | `chroma_hist`：色度直方圖取分位數當閾值，自動跟著距離 / 光照走；**dart 也沒有** |
 | UART / OSD | 定長結果上報（**v3 = 34 位元組**，含速度/距離/下墜/最終瞄準點 + CRC16 + 序號）+ `0xAA` 協議寫參數；OSD 疊數值與直方圖條形圖（皆預設關閉） |
 | 標記輸出 | **紅色圓環**套住綠燈（半徑 = (寬+高)/4，環寬 ±`RING_T`）+ **瞄準點紅色十字**；另可切純二值圖模式方便調門檻 |
@@ -582,8 +610,13 @@ cd sim
 # 等同於： xvlog <設計檔...> ; xelab -debug typical tb_armor_vision -s tb_vision ; xsim tb_vision -runall
 ```
 
+> **改單個模組時用秒級單測**：`sim/tb_tacc.v` 只例化 `temporal_acc`（8×4 小尺寸）+ 稀疏像素流，
+> 9 項自檢，`xvlog + xelab + xsim` **5 秒** 跑完（主測試台一輪要 8~10 分鐘）。
+> 本輪就是縿它抓出累積器「寫地址錯一拍」的 bug，詳見 `doc/vision_pipeline.md` §22。
+
 測試台造出與 `lcd_driver`（800×480 面板）**完全相同**的時序，影像為
-**一個綠色實心圓**（圓心 (400,240)、半徑 100、`RGB565 = 0x750E` → `r8=118 g8=162 b8=118`），並驗證 **44 項**：
+**一個綠色實心圓**（圓心 (400,240)、半徑 100、`RGB565 = 0x750E` → `r8=118 g8=162 b8=118`），並驗證 **126 項**
+（下表為階段 1~2 的 44 項明細，其餘見 `doc/vision_pipeline.md` §11）：
 
 | 階段 | 檢查 | 期望 | 說明 |
 |---|---|---|---|
@@ -602,7 +635,7 @@ cd sim
 | 6 | `sel` | 2 | 再按 `key[0]` 一次 → 選中項切到 `TH_G-B` |
 | 7 | `disp_bin` / `bin_white` | 1 / `0xFFFF` | 按 `key[3]` → 純二值模式，圓內顯示白色 |
 
-實測輸出：`==== ALL CHECKS PASSED ====`（44 項）。
+實測輸出：`==== ALL CHECKS PASSED ====`（14 個階段共 126 項；`sim/tb_tacc.v` 另有 11 項秒級單測）。
 
 > **階段 2 是關鍵回歸**：舊版「取最長連續 run」的投影在這裡會退化成 `h≈84`、`center_y≈190`
 > （框只剩上半邊）—— 那就是「轉一點角度就識別不到」的現場。改成「取外沿」後，
@@ -714,11 +747,17 @@ Block RAM 0。原 39 例程的資源仍然充裕。完整報告：`doc/synth_uti
 | `to_gbk.py` | 新增檔案的中文註解 UTF-8 → GBK |
 | `to_simplified_gbk.py` | 中文由繁體轉簡體並統一存成 GBK |
 | `check_project_paths.py` | 檢查 `.xpr` 引用的檔案是否都在 |
+| `patch_p11_*.py` + `gen_ballistic_lut.py` + `patch_result_frame_v3.py` | P11：距離/下墜補償、上報幀 v3（34 位元組 + CRC16 + 序號）、三個參數改運行時端口 |
+| `patch_p12_tacc.py` + `patch_p12_tb.py` + `patch_p12_fix.py` | P12：多幀累積（新增 `rtl/temporal_acc.v`）、`reg_file` 新增 `0x0C`、測試台相位 14 與 UART **兩幀**核對（序號遞增 + 軟體 CRC 對拍） |
+| `fix_tb_dump.py` | 修補丁工具的字面量轉義坑（`re.sub` 會把替換串裡的 `\n` 展開，改成 `str.replace`） |
 
 ### 13. 編碼注意（**很重要**）
 
 - `rtl/*.v`、`prj/**/*.xdc` 等 Vivado 檔案是 **GBK** 編碼（Vivado 在中文 Windows 下用 ANSI）。
 - `doc/*.md`、`tools/*.py` 是 **UTF-8**。
+- **不要用「猜編碼」的自動轉換**：把 UTF-8 檔當 GBK 讀、再寫回 UTF-8 會產生 **U+FFFD 替換字元**，中文註解**不可逆損毀**
+  （本倉庫 `rtl/reg_file.v`、`rtl/osd_text.v` 的註解在歷史提交裡就已經是壞的，`rtl/temporal_acc.v` 也中過一次、已重建）。
+  轉碼只能單向一次：**UTF-8 讀 → GBK 寫**，寫完立刻回讀比對。
 - 用 VS Code 編輯 `.v` 時請確認右下角編碼是 `GBK`；若存成 UTF-8，Vivado 內建編輯器看到的中文註解會變亂碼。
 - 要**批次改 GBK 檔案**請照 `tools/patch_green.py` 的做法用 Python 處理。
 

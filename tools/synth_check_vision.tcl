@@ -47,6 +47,7 @@ read_verilog [list \
     $rtl/track_ab.v \
     $rtl/aim_predict.v \
     $rtl/ballistic.v \
+    $rtl/temporal_acc.v \
     $rtl/chroma_hist.v \
     $rtl/vision_stat.v \
     $rtl/uart_tx.v \

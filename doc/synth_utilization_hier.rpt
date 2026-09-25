@@ -1,7 +1,7 @@
 Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
 -----------------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
-| Date         : Fri Sep 25 21:02:02 2026
+| Date         : Fri Sep 25 22:20:39 2026
 | Host         : EddieDuanLegionY7000P running 64-bit major release  (build 9200)
 | Command      : report_utilization -hierarchical -file C:/Users/DUANboyang/Desktop/FPGA4dart/doc/synth_utilization_hier.rpt
 | Design       : armor_vision
@@ -21,11 +21,12 @@ Table of Contents
 +-----------------------------------+--------------------------------+------------+------------+---------+------+------+--------+--------+------------+
 |              Instance             |             Module             | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs | RAMB36 | RAMB18 | DSP Blocks |
 +-----------------------------------+--------------------------------+------------+------------+---------+------+------+--------+--------+------------+
-| armor_vision                      |                          (top) |       7171 |       4563 |    2608 |    0 | 2990 |      0 |      0 |         21 |
-|   (armor_vision)                  |                          (top) |        261 |        261 |       0 |    0 |  325 |      0 |      0 |          0 |
-|   u_aim_predict                   |                    aim_predict |        277 |        277 |       0 |    0 |   87 |      0 |      0 |          3 |
-|   u_blob_track                    |                     blob_track |       1723 |       1723 |       0 |    0 | 1117 |      0 |      0 |         14 |
-|   u_chroma_hist                   |                    chroma_hist |        665 |        345 |     320 |    0 |  121 |      0 |      0 |          0 |
+| armor_vision                      |                          (top) |       7488 |       4880 |    2608 |    0 | 3237 |     24 |      0 |         24 |
+|   (armor_vision)                  |                          (top) |         81 |         81 |       0 |    0 |  327 |      0 |      0 |          0 |
+|   u_aim_predict                   |                    aim_predict |        238 |        238 |       0 |    0 |   78 |      0 |      0 |          2 |
+|   u_ballistic                     |                      ballistic |        144 |        144 |       0 |    0 |   53 |      0 |      0 |          2 |
+|   u_blob_track                    |                     blob_track |       1633 |       1633 |       0 |    0 | 1117 |      0 |      0 |         14 |
+|   u_chroma_hist                   |                    chroma_hist |        789 |        469 |     320 |    0 |  121 |      0 |      0 |          1 |
 |   u_dilate                        |                      morph_nxn |        189 |         85 |     104 |    0 |   72 |      0 |      0 |          0 |
 |     (u_dilate)                    |                      morph_nxn |         32 |         32 |       0 |    0 |   72 |      0 |      0 |          0 |
 |     gen_line_buf[0].u_line_buffer | line_buffer__parameterized0_19 |         32 |         19 |      13 |    0 |    0 |      0 |      0 |          0 |
@@ -36,11 +37,11 @@ Table of Contents
 |     gen_line_buf[5].u_line_buffer | line_buffer__parameterized0_24 |         18 |          5 |      13 |    0 |    0 |      0 |      0 |          0 |
 |     gen_line_buf[6].u_line_buffer | line_buffer__parameterized0_25 |         20 |          7 |      13 |    0 |    0 |      0 |      0 |          0 |
 |     gen_line_buf[7].u_line_buffer | line_buffer__parameterized0_26 |         17 |          4 |      13 |    0 |    0 |      0 |      0 |          0 |
-|   u_erode                         |      morph_nxn__parameterized0 |        181 |         77 |     104 |    0 |   72 |      0 |      0 |          0 |
+|   u_erode                         |      morph_nxn__parameterized0 |        179 |         75 |     104 |    0 |   72 |      0 |      0 |          0 |
 |     (u_erode)                     |      morph_nxn__parameterized0 |         36 |         36 |       0 |    0 |   72 |      0 |      0 |          0 |
 |     gen_line_buf[0].u_line_buffer |    line_buffer__parameterized0 |         16 |          3 |      13 |    0 |    0 |      0 |      0 |          0 |
 |     gen_line_buf[1].u_line_buffer | line_buffer__parameterized0_12 |         18 |          5 |      13 |    0 |    0 |      0 |      0 |          0 |
-|     gen_line_buf[2].u_line_buffer | line_buffer__parameterized0_13 |         23 |         10 |      13 |    0 |    0 |      0 |      0 |          0 |
+|     gen_line_buf[2].u_line_buffer | line_buffer__parameterized0_13 |         21 |          8 |      13 |    0 |    0 |      0 |      0 |          0 |
 |     gen_line_buf[3].u_line_buffer | line_buffer__parameterized0_14 |         17 |          4 |      13 |    0 |    0 |      0 |      0 |          0 |
 |     gen_line_buf[4].u_line_buffer | line_buffer__parameterized0_15 |         16 |          3 |      13 |    0 |    0 |      0 |      0 |          0 |
 |     gen_line_buf[5].u_line_buffer | line_buffer__parameterized0_16 |         18 |          5 |      13 |    0 |    0 |      0 |      0 |          0 |
@@ -50,16 +51,17 @@ Table of Contents
 |     (u_median)                    |                      median3x3 |        268 |        268 |       0 |    0 |  112 |      0 |      0 |          0 |
 |     u_lb0                         |                 line_buffer_10 |        325 |        117 |     208 |    0 |    0 |      0 |      0 |          0 |
 |     u_lb1                         |                 line_buffer_11 |        341 |        133 |     208 |    0 |    0 |      0 |      0 |          0 |
-|   u_osd                           |                       osd_text |        228 |        228 |       0 |    0 |  261 |      0 |      0 |          0 |
-|   u_overlay_box                   |                    overlay_box |        100 |        100 |       0 |    0 |    0 |      0 |      0 |          4 |
-|   u_reg_file                      |                       reg_file |        145 |        145 |       0 |    0 |   79 |      0 |      0 |          0 |
-|   u_result_frame                  |                   result_frame |        105 |        105 |       0 |    0 |  179 |      0 |      0 |          0 |
-|     (u_result_frame)              |                   result_frame |         78 |         78 |       0 |    0 |  148 |      0 |      0 |          0 |
-|     u_tx                          |                        uart_tx |         27 |         27 |       0 |    0 |   31 |      0 |      0 |          0 |
+|   u_osd                           |                       osd_text |        230 |        230 |       0 |    0 |  261 |      0 |      0 |          0 |
+|   u_overlay_box                   |                    overlay_box |        173 |        173 |       0 |    0 |    0 |      0 |      0 |          4 |
+|   u_reg_file                      |                       reg_file |        204 |        204 |       0 |    0 |  107 |      0 |      0 |          0 |
+|   u_result_frame                  |                   result_frame |        228 |        228 |       0 |    0 |  265 |      0 |      0 |          0 |
+|     (u_result_frame)              |                   result_frame |        200 |        200 |       0 |    0 |  234 |      0 |      0 |          0 |
+|     u_tx                          |                        uart_tx |         28 |         28 |       0 |    0 |   31 |      0 |      0 |          0 |
 |   u_seg_display                   |                    seg_display |         61 |         61 |       0 |    0 |   19 |      0 |      0 |          0 |
+|   u_temporal_acc                  |                   temporal_acc |         86 |         86 |       0 |    0 |   87 |     24 |      0 |          1 |
 |   u_uart_rx                       |                        uart_rx |         34 |         34 |       0 |    0 |   40 |      0 |      0 |          0 |
-|   u_video_delay                   |                    video_delay |       1986 |        322 |    1664 |    0 |  128 |      0 |      0 |          0 |
-|     (u_video_delay)               |                    video_delay |         56 |         56 |       0 |    0 |  128 |      0 |      0 |          0 |
+|   u_video_delay                   |                    video_delay |       1987 |        323 |    1664 |    0 |  128 |      0 |      0 |          0 |
+|     (u_video_delay)               |                    video_delay |         57 |         57 |       0 |    0 |  128 |      0 |      0 |          0 |
 |     gen_line_buf[0].u_line_buffer |                    line_buffer |        241 |         33 |     208 |    0 |    0 |      0 |      0 |          0 |
 |     gen_line_buf[1].u_line_buffer |                  line_buffer_3 |        240 |         32 |     208 |    0 |    0 |      0 |      0 |          0 |
 |     gen_line_buf[2].u_line_buffer |                  line_buffer_4 |        240 |         32 |     208 |    0 |    0 |      0 |      0 |          0 |
@@ -68,8 +70,8 @@ Table of Contents
 |     gen_line_buf[5].u_line_buffer |                  line_buffer_7 |        240 |         32 |     208 |    0 |    0 |      0 |      0 |          0 |
 |     gen_line_buf[6].u_line_buffer |                  line_buffer_8 |        242 |         34 |     208 |    0 |    0 |      0 |      0 |          0 |
 |     gen_line_buf[7].u_line_buffer |                  line_buffer_9 |        247 |         39 |     208 |    0 |    0 |      0 |      0 |          0 |
-|   u_vision_cfg                    |                     vision_cfg |        101 |        101 |       0 |    0 |  119 |      0 |      0 |          0 |
-|     (u_vision_cfg)                |                     vision_cfg |          5 |          5 |       0 |    0 |   27 |      0 |      0 |          0 |
+|   u_vision_cfg                    |                     vision_cfg |        118 |        118 |       0 |    0 |  119 |      0 |      0 |          0 |
+|     (u_vision_cfg)                |                     vision_cfg |         22 |         22 |       0 |    0 |   27 |      0 |      0 |          0 |
 |     gen_key[0].u_key_debounce     |                   key_debounce |         17 |         17 |       0 |    0 |   23 |      0 |      0 |          0 |
 |     gen_key[1].u_key_debounce     |                 key_debounce_0 |         44 |         44 |       0 |    0 |   23 |      0 |      0 |          0 |
 |     gen_key[2].u_key_debounce     |                 key_debounce_1 |         18 |         18 |       0 |    0 |   23 |      0 |      0 |          0 |

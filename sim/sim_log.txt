@@ -27,6 +27,8 @@ INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4da
 INFO: [VRFC 10-311] analyzing module aim_predict
 INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/ballistic.v" into library work
 INFO: [VRFC 10-311] analyzing module ballistic
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/temporal_acc.v" into library work
+INFO: [VRFC 10-311] analyzing module temporal_acc
 INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/chroma_hist.v" into library work
 INFO: [VRFC 10-311] analyzing module chroma_hist
 INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/vision_stat.v" into library work
@@ -70,6 +72,7 @@ Compiling module work.color_seg
 Compiling module work.line_buffer
 Compiling module work.morph_nxn_default
 Compiling module work.video_delay_default
+Compiling module work.temporal_acc_default
 Compiling module work.blob_track_default
 Compiling module work.track_ab_default
 Compiling module work.aim_predict_default
@@ -82,6 +85,7 @@ Compiling module work.result_frame
 Compiling module work.vision_stat
 Compiling module work.seg_display_default
 Compiling module work.armor_vision(AIM_H_Q8=16'b010000...
+Compiling module work.temporal_acc(WIDTH=8,HEIGHT=4,AW...
 Compiling module work.tb_armor_vision
 Built simulation snapshot tb_vision
 
@@ -91,7 +95,7 @@ Built simulation snapshot tb_vision
     ** Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
 
 source C:/Users/DUANboyang/Desktop/FPGA4dart/sim/xsim.dir/tb_vision/webtalk/xsim_webtalk.tcl -notrace
-INFO: [Common 17-206] Exiting Webtalk at Fri Sep 25 21:32:47 2026...
+INFO: [Common 17-206] Exiting Webtalk at Fri Sep 25 22:06:38 2026...
 ---- simulate ----
 
 ****** xsim v2020.2 (64-bit)
@@ -170,3 +174,94 @@ run -all
 ---- phase 6 : key[0] x1 -> select TH_G-B ----
   [OK]   sel = 2 (0x00000002)
 ---- phase 7 : key[3] x1 -> binary display mode ----
+  [OK]   disp_bin = 1 (0x00000001)
+  [OK]   bin_white = 65535 (0x0000ffff)
+---- phase 8 : vision_stat instrumentation (P0) ----
+     frame period = H_TOTAL*V_TOTAL = 1056*525 = 554400 clk
+  [OK]   frame_lines = 480 (0x000001e0)
+  [OK]   frame_cyc = 554400 (0x000875a0)
+  [OK]   mask_cnt = 31417 in [30000, 33000]
+  [OK]   hit_frames!=0 = 1 (0x00000001)
+  [OK]   miss_frames!=0 = 1 (0x00000001)
+  [OK]   t_fps = 2 (0x00000002)
+  [OK]   t_frame_lines = 480 (0x000001e0)
+---- phase 9 : track_ab unit test (P4) ----
+  [OK]   ta_hit1_valid0 = 0 (0x00000000)
+  [OK]   ta_hit2_valid1 = 1 (0x00000001)
+  [OK]   ta_cx = 400 (expect 400 +-6)
+  [OK]   ta_hold_valid = 1 (0x00000001)
+  [OK]   ta_gate_reject = 1 (0x00000001)
+  [OK]   ta_gate_lost = 4 (0x00000004)
+  [OK]   ta_not_jump = 400 (expect 400 +-40)
+  [OK]   ta_drop_valid = 0 (0x00000000)
+---- phase 10 : FAR / SMALL lamp (r=8, ~200 px) ----
+  [OK]   far_valid = 1 (0x00000001)
+  [OK]   far_flag = 1 (0x00000001)
+  [OK]   far_w = 17 in [12, 22]
+  [OK]   far_cx = 408 (expect 408 +-3)
+  [OK]   far_cy = 248 (expect 248 +-3)
+  [OK]   far_lo_off = 0 (0x00000000)
+---- phase 11 : MOVING lamp + velocity lead prediction ----
+  [OK]   near_lo_off = 1 (0x00000001)
+  [OK]   mov_pred_ok = 1 (0x00000001)
+  [OK]   mov_flag = 1 (0x00000001)
+  [OK]   mov_vx_pos = 1 (0x00000001)
+  [OK]   mov_lead_dir = 1 (0x00000001)
+  [OK]   mov_lead_amt = 20 in [8, 48]
+  [OK]   mov_ay_inside = 1 (0x00000001)
+---- phase 12 : result_frame v2 (24 bytes) over UART ----
+  [OK]   uart_nbytes = 68 (0x00000044)
+  [OK]   uart_hdr0 = 165 (0x000000a5)
+  [OK]   uart_hdr1 = 90 (0x0000005a)
+  [OK]   uart_flags = 187 (0x000000bb)
+  [OK]   uart_cx = 408 (0x00000198)
+  [OK]   uart_cy = 248 (0x000000f8)
+  [OK]   uart_ay = 198 (0x000000c6)
+  [OK]   uart_w = 201 (0x000000c9)
+  [OK]   uart_area7 = 250 (0x000000fa)
+  [OK]   uart_fill = 200 (0x000000c8)
+  [OK]   uart_vx = 96 (0x00000060)
+  [OK]   uart_vy = 0 (0x00000000)
+  [OK]   uart_px = 440 (0x000001b8)
+  [OK]   uart_py = 248 (0x000000f8)
+  [OK]   uart_dist = 505 (0x000001f9)
+  [OK]   uart_drop = 159 (0x0000009f)
+  [OK]   uart_fx = 408 (0x00000198)
+  [OK]   uart_fy = 178 (0x000000b2)
+  [OK]   uart_seq_inc = 1 (0x00000001)
+  [OK]   uart2_hdr0 = 165 (0x000000a5)
+  [OK]   uart2_hdr1 = 90 (0x0000005a)
+  [OK]   uart_crc_sw = 35602 (0x00008b12)
+  [OK]   uart2_crc_sw = 39731 (0x00009b33)
+  raw_frame1: a5 5a bb 01 98 00 f8 01 98 00 c6 c9 fa c8 01 00 60 00 00 01 b8 00 f8 01 f9 00 9f 01 98 00 b2 00 8b 12
+  raw_frame2: a5 5a bb 01 98 00 f8 01 98 00 c6 c9 fa c8 01 00 60 00 00 01 b8 00 f8 01 f9 00 9f 01 98 00 b2 01 9b 33
+---- phase 13 : ballistic (distance + drop) unit test ----
+  [OK]   bal_ok = 1 (0x00000001)
+  [OK]   bal_dist_w100 = 141 (0x0000008d)
+  [OK]   bal_drop_w100 = 45 (0x0000002d)
+  [OK]   bal_fy_w100 = 178 (0x000000b2)
+  [OK]   bal_fx_w100 = 300 (0x0000012c)
+  [OK]   bal_dist_w201 = 70 (0x00000046)
+  [OK]   bal_drop_w201 = 22 (0x00000016)
+  [OK]   bal_fy_w201 = 176 (0x000000b0)
+  [OK]   bal_drop_v25 = 14 (0x0000000e)
+  [OK]   bal_fy_v25 = 184 (0x000000b8)
+  [OK]   main_dist_ok = 1 (0x00000001)
+  [OK]   main_dist = 70 in [69, 72]
+  [OK]   main_drop = 22 in [21, 23]
+---- phase 14 : temporal_acc (P12) unit test ----
+  [OK]   tacc_hit1 = 0 (0x00000000)
+  [OK]   tacc_hit2 = 1 (0x00000001)
+  [OK]   tacc_align_x = 2 (0x00000002)
+  [OK]   tacc_align_y = 1 (0x00000001)
+  [OK]   tacc_align_de = 1 (0x00000001)
+  [OK]   tacc_decay = 0 (0x00000000)
+  [OK]   tacc_noise = 0 (0x00000000)
+  [OK]   tacc_noise_x = 5 (0x00000005)
+  [OK]   tacc_persist = 1 (0x00000001)
+==== ALL CHECKS PASSED ====
+$finish called at time : 1286263800 ns : File "C:/Users/DUANboyang/Desktop/FPGA4dart/sim/tb_armor_vision.v" Line 989
+run: Time (s): cpu = 00:00:03 ; elapsed = 00:10:53 . Memory (MB): peak = 925.707 ; gain = 0.039
+exit
+INFO: [Common 17-206] Exiting xsim at Fri Sep 25 22:17:37 2026...
+请按任意键继续. . . 

@@ -74,7 +74,8 @@ module armor_vision #(
     parameter PRED_EN         = 1'b1   ,   // 速度预测（lead）总开关
     parameter [7:0] LEAD_Q4_DEF = 8'd64,   // 提前量：帧数 x16（64 = 4.0 帧，30fps 约 133ms）
     parameter DIST_EN         = 1'b1  ,   // 弹道补偿（距离 + 下坠）总开关
-    parameter [7:0] DROP_SCALE_DEF = 8'd255,   // Q8 弹速修正：255 = 基准 20m/s
+    parameter [7:0] DROP_SCALE_DEF = 8'd255,
+    parameter TACC_EN         = 1'b0  ,   // 多帧时域累积（默认关；开了灵敏度↑但要 20+ 个 BRAM）   // Q8 弹速修正：255 = 基准 20m/s
     //  ---- P4：时序跟踪 ----
     parameter TRK_EN      = 1'b0       ,   // 默认关（保持原有逐帧行为）
     parameter GATE        = 96         ,   // 门控半径（像素）
@@ -210,6 +211,11 @@ wire [AW-1:0] ring_t_eff     ;   // 0x06（必须和端口同宽，否则高位悬空成 z）
 wire [AW-1:0] gate_eff       ;   // 0x08（同上）
 wire [7:0]    pct_eff        ;   // 0x09
 wire [7:0]    drop_sc_eff    ;   // 0x0B
+wire [7:0]    rf_tacc        ;   // 0x0C
+wire [1:0]    thr_eff        ;   // 累积阈值
+wire          tacc_en, tacc_clr;
+wire          mask_t, de_t   ;   // 累积后的掩码（与 x_t/y_t 对齐）
+wire [AW-1:0] x_t, y_t       ;
 
 //*****************************************************
 //**                    main code
@@ -303,6 +309,7 @@ reg_file u_reg_file (
     .r_pct      (rf_pct      ),
     .r_lead_q4  (rf_lead_q4 ),
     .r_drop_sc  (rf_drop_sc ),
+    .r_tacc     (rf_tacc    ),
     .wr_pulse   (rf_wr_pulse )
 );
 
@@ -319,6 +326,7 @@ wire aec_on   = AEC_EN   | rf_ctrl[2];
 wire osd_on_e = OSD_EN   | rf_ctrl[4];
 wire pred_on  = PRED_EN  | rf_ctrl[5];   // b5 = 速度预测使能
 wire dist_on  = DIST_EN  | rf_ctrl[6];   // b6 = 弹道补偿使能
+wire tacc_on  = TACC_EN  | rf_ctrl[7];   // b7 = 多帧累积使能
 
 wire [7:0] th_g  = reg_written ? rf_th_g  : th_g_kbd;
 wire [7:0] th_gr = adapt_on ? th_gr_auto : (reg_written ? rf_th_gr : th_gr_kbd);
@@ -337,6 +345,9 @@ assign ring_t_eff  = reg_written ? {{(AW-8){1'b0}}, rf_ring_t} : RING_T[AW-1:0];
 assign gate_eff    = reg_written ? {{(AW-8){1'b0}}, rf_gate}   : GATE[AW-1:0];
 assign pct_eff     = reg_written ? rf_pct    : ADAPT_PCT[7:0];
 assign drop_sc_eff = reg_written ? rf_drop_sc : DROP_SCALE_DEF;
+assign thr_eff     = reg_written ? rf_tacc[1:0] : 2'd2;
+assign tacc_en     = tacc_on;
+assign tacc_clr    = reg_written & rf_tacc[7];
 
 //-------------------------------------------------------
 // (3) 中值预滤波（MED 关时纯直通，零延迟）
@@ -453,6 +464,31 @@ video_delay #(
 //  所以只写别的阈值寄存器不会把瞄准高度改掉。
 wire [15:0] aim_h_eff = reg_written ? {AIM_H_Q8[15:8], rf_aim_h} : AIM_H_Q8;
 
+//-------------------------------------------------------
+// (8b) 多帧时域累积（P12）：把闪变的远灯粘住，同时压掉单帧噪声
+//   关掉（默认）时是纯直通、零延迟 -> 行为与没有这个模块逐位一致；
+//   打开后掩码晚 2 拍，所以 x/y/de 一起延 2 拍（保证坐标对齐）。
+//-------------------------------------------------------
+temporal_acc #(
+    .WIDTH  (IMG_W),
+    .HEIGHT (IMG_H),
+    .AW     (AW   )
+) u_temporal_acc (
+    .clk     (clk       ),
+    .rst_n   (rst_n     ),
+    .de      (de_v      ),
+    .x       (x_v       ),
+    .y       (y_cnt     ),
+    .mask_in (mask_d    ),
+    .en      (tacc_en   ),
+    .thr     (thr_eff   ),
+    .clr     (tacc_clr  ),
+    .x_o     (x_t       ),
+    .y_o     (y_t       ),
+    .de_o    (de_t      ),
+    .mask_o  (mask_t    )
+);
+
 blob_track #(
     .WIDTH    (IMG_W    ),
     .HEIGHT   (IMG_H    ),
@@ -462,10 +498,10 @@ blob_track #(
     .clk        (clk        ),
     .rst_n      (rst_n      ),
     .vsync      (vsync      ),
-    .de         (de_v       ),
-    .x          (x_v        ),
-    .y          (y_cnt      ),
-    .mask       (mask_d     ),
+    .de         (de_t       ),
+    .x          (x_t        ),
+    .y          (y_t        ),
+    .mask       (mask_t     ),   // P12：多帧累积后的掩码（关掉时 == mask_d）
     .min_area_lo (min_area_lo_eff),   // 宽松档：远 / 小目标也要认出来
     .aim_h_q8   (aim_h_eff   ),   // 运行时可变：UART 0x05 只覆盖低 8 位（小数）
     .bond_valid (raw_valid  ),

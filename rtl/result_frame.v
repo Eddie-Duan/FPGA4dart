@@ -135,7 +135,11 @@ always @(posedge clk or negedge rst_n) begin
         b[25]<=8'h00; b[26]<=8'h00; b[27]<=8'h00; b[28]<=8'h00; b[29]<=8'h00;
         b[30]<=8'h00; b[31]<=8'h00;
     end
-    else if(tx_now) begin
+    //  只在「帧起始」那一拍锁存：tx_now 是电平型触发，一帧的发送时间（约 74,000 拍 @115200、
+    //  34 字节）远大于 frame_tick 周期，不判 state 就会在发送途中重复锁存 ->
+    //  传出去的 seq 与 CRC 对不上、接收端必然丢帧；真实工程里每帧变化的 cx/cy/w
+    //  还会被中途更新，把两帧内容混成一帧。
+    else if(tx_now && (state == S_IDLE)) begin
         b[0]  <= 8'hA5;
         b[1]  <= 8'h5A;
         b[2]  <= flags;

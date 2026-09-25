@@ -1,7 +1,7 @@
 Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
 ----------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
-| Date         : Fri Sep 25 21:02:12 2026
+| Date         : Fri Sep 25 22:20:55 2026
 | Host         : EddieDuanLegionY7000P running 64-bit major release  (build 9200)
 | Command      : report_timing_summary -delay_type max -max_paths 5 -file C:/Users/DUANboyang/Desktop/FPGA4dart/doc/synth_timing_precheck.rpt
 | Design       : armor_vision
@@ -128,7 +128,7 @@ Table of Contents
 
     WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
     -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
-      5.388        0.000                      0                30202        8.870        0.000                       0                  5598  
+      6.640        0.000                      0                31482        8.870        0.000                       0                  5893  
 
 
 All user specified timing constraints are met.
@@ -151,7 +151,7 @@ ooc_clk  {0.000 10.000}     20.000          50.000
 
 Clock             WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
 -----             -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
-ooc_clk             5.388        0.000                      0                30202        8.870        0.000                       0                  5598  
+ooc_clk             6.640        0.000                      0                31482        8.870        0.000                       0                  5893  
 
 
 ------------------------------------------------------------------------------------------------
@@ -182,7 +182,7 @@ Path Group    From Clock    To Clock          WNS(ns)      TNS(ns)  TNS Failing 
 From Clock:  ooc_clk
   To Clock:  ooc_clk
 
-Setup :            0  Failing Endpoints,  Worst Slack        5.388ns,  Total Violation        0.000ns
+Setup :            0  Failing Endpoints,  Worst Slack        6.640ns,  Total Violation        0.000ns
 Hold  :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
 PW    :            0  Failing Endpoints,  Worst Slack        8.870ns,  Total Violation        0.000ns
 ---------------------------------------------------------------------------------------------------
@@ -190,16 +190,16 @@ PW    :            0  Failing Endpoints,  Worst Slack        8.870ns,  Total Vio
 
 Max Delay Paths
 --------------------------------------------------------------------------------------
-Slack (MET) :             5.388ns  (required time - arrival time)
-  Source:                 u_blob_track/center_y_reg[1]/C
+Slack (MET) :             6.640ns  (required time - arrival time)
+  Source:                 u_median/dout_reg[5]/C
                             (rising edge-triggered cell FDCE clocked by ooc_clk  {rise@0.000ns fall@10.000ns period=20.000ns})
-  Destination:            u_aim_predict/pay_reg[8]/D
+  Destination:            u_blob_track/emit_x0_reg[0]/CE
                             (rising edge-triggered cell FDCE clocked by ooc_clk  {rise@0.000ns fall@10.000ns period=20.000ns})
   Path Group:             ooc_clk
   Path Type:              Setup (Max at Slow Process Corner)
   Requirement:            20.000ns  (ooc_clk rise@20.000ns - ooc_clk rise@0.000ns)
-  Data Path Delay:        14.566ns  (logic 9.233ns (63.387%)  route 5.333ns (36.613%))
-  Logic Levels:           22  (CARRY4=14 DSP48E1=1 LUT2=4 LUT3=1 LUT6=2)
+  Data Path Delay:        13.120ns  (logic 4.379ns (33.377%)  route 8.741ns (66.623%))
+  Logic Levels:           20  (CARRY4=6 LUT2=1 LUT3=2 LUT4=2 LUT5=3 LUT6=6)
   Clock Path Skew:        -0.039ns (DCD - SCD + CPR)
     Destination Clock Delay (DCD):    0.748ns = ( 20.748 - 20.000 ) 
     Source Clock Delay      (SCD):    0.787ns
@@ -214,96 +214,83 @@ Slack (MET) :             5.388ns  (required time - arrival time)
   -------------------------------------------------------------------    -------------------
                          (clock ooc_clk rise edge)    0.000     0.000 r  
                                                       0.000     0.000 r  clk (IN)
-                         net (fo=5597, unset)         0.787     0.787    u_blob_track/clk
-                         FDCE                                         r  u_blob_track/center_y_reg[1]/C
+                         net (fo=5892, unset)         0.787     0.787    u_median/clk
+                         FDCE                                         r  u_median/dout_reg[5]/C
   -------------------------------------------------------------------    -------------------
-                         FDCE (Prop_fdce_C_Q)         0.379     1.166 r  u_blob_track/center_y_reg[1]/Q
-                         net (fo=11, unplaced)        0.408     1.574    u_blob_track/center_y_reg[9]_0[1]
-                         LUT2 (Prop_lut2_I0_O)        0.232     1.806 r  u_blob_track/vy_s[7]_i_15/O
-                         net (fo=1, unplaced)         0.000     1.806    u_blob_track/vy_s[7]_i_15_n_0
-                         CARRY4 (Prop_carry4_S[1]_CO[3])
-                                                      0.457     2.263 r  u_blob_track/vy_s_reg[7]_i_8/CO[3]
-                         net (fo=1, unplaced)         0.008     2.271    u_blob_track/vy_s_reg[7]_i_8_n_0
-                         CARRY4 (Prop_carry4_CI_O[0])
-                                                      0.191     2.462 r  u_blob_track/vy_s_reg[15]_i_14/O[0]
-                         net (fo=2, unplaced)         0.552     3.014    u_aim_predict/dy40[4]
-                         CARRY4 (Prop_carry4_DI[3]_CO[3])
-                                                      0.451     3.465 r  u_aim_predict/vy_s_reg[7]_i_7/CO[3]
-                         net (fo=1, unplaced)         0.000     3.465    u_aim_predict/vy_s_reg[7]_i_7_n_0
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275     3.740 r  u_aim_predict/vy_s_reg[15]_i_9/O[3]
-                         net (fo=1, unplaced)         0.519     4.259    u_aim_predict/vy_s_reg[15]_i_9_n_4
-                         LUT2 (Prop_lut2_I1_O)        0.250     4.509 r  u_aim_predict/vy_s[11]_i_4/O
-                         net (fo=1, unplaced)         0.000     4.509    u_aim_predict/vy_s[11]_i_4_n_0
-                         CARRY4 (Prop_carry4_S[2]_CO[3])
-                                                      0.332     4.841 r  u_aim_predict/vy_s_reg[11]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.000     4.841    u_aim_predict/vy_s_reg[11]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275     5.116 r  u_aim_predict/vy_s_reg[15]_i_2/O[3]
-                         net (fo=17, unplaced)        0.575     5.691    u_aim_predict/nvy[15]
-                         LUT3 (Prop_lut3_I2_O)        0.250     5.941 r  u_aim_predict/vy_s[15]_i_1/O
-                         net (fo=16, unplaced)        0.646     6.587    u_aim_predict/vyn[15]
-                         DSP48E1 (Prop_dsp48e1_A[29]_P[9])
-                                                      3.230     9.817 r  u_aim_predict/muly/P[9]
-                         net (fo=1, unplaced)         0.646    10.462    u_blob_track/pcy_reg[9][1]
-                         LUT2 (Prop_lut2_I1_O)        0.105    10.567 r  u_blob_track/pcy[3]_i_5/O
-                         net (fo=1, unplaced)         0.000    10.567    u_blob_track/pcy[3]_i_5_n_0
-                         CARRY4 (Prop_carry4_S[1]_CO[3])
-                                                      0.457    11.024 r  u_blob_track/pcy_reg[3]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.008    11.032    u_blob_track/pcy_reg[3]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    11.130 r  u_blob_track/pcy_reg[7]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.000    11.130    u_blob_track/pcy_reg[7]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    11.228 r  u_blob_track/pcy_reg[9]_i_3/CO[3]
-                         net (fo=1, unplaced)         0.000    11.228    u_aim_predict/pcy_reg[0]_0[0]
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275    11.503 f  u_aim_predict/pcy_reg[9]_i_4/O[3]
-                         net (fo=41, unplaced)        0.596    12.099    u_aim_predict_n_72
-                         LUT2 (Prop_lut2_I1_O)        0.253    12.352 r  pcy[9]_i_6/O
-                         net (fo=1, unplaced)         0.000    12.352    pcy[9]_i_6_n_0
-                         CARRY4 (Prop_carry4_DI[1]_CO[1])
-                                                      0.406    12.758 r  pcy_reg[9]_i_2/CO[1]
-                         net (fo=39, unplaced)        0.316    13.074    u_aim_predict/CO[0]
-                         LUT6 (Prop_lut6_I4_O)        0.277    13.351 r  u_aim_predict/pay[9]_i_31/O
-                         net (fo=1, unplaced)         0.537    13.888    u_aim_predict/pay[9]_i_31_n_0
+                         FDCE (Prop_fdce_C_Q)         0.379     1.166 r  u_median/dout_reg[5]/Q
+                         net (fo=11, unplaced)        0.645     1.811    u_median/dout_reg[5]_0[0]
+                         LUT3 (Prop_lut3_I0_O)        0.251     2.062 r  u_median/hgr_reg_0_127_0_0_i_42/O
+                         net (fo=14, unplaced)        0.633     2.695    u_median/pix_seg[5]
+                         LUT6 (Prop_lut6_I0_O)        0.105     2.800 r  u_median/mem_reg_0_255_0_0_i_255/O
+                         net (fo=1, unplaced)         0.537     3.337    u_median/mem_reg_0_255_0_0_i_255_n_0
                          CARRY4 (Prop_carry4_DI[1]_CO[3])
-                                                      0.418    14.306 r  u_aim_predict/pay_reg[9]_i_17/CO[3]
-                         net (fo=1, unplaced)         0.008    14.314    u_aim_predict/pay_reg[9]_i_17_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    14.412 r  u_aim_predict/pay_reg[9]_i_6/CO[3]
-                         net (fo=1, unplaced)         0.000    14.412    u_aim_predict/pay_reg[9]_i_6_n_0
-                         CARRY4 (Prop_carry4_CI_CO[1])
-                                                      0.149    14.561 r  u_aim_predict/pay_reg[9]_i_2/CO[1]
-                         net (fo=10, unplaced)        0.515    15.076    u_aim_predict/pay_p1
-                         LUT6 (Prop_lut6_I0_O)        0.277    15.353 r  u_aim_predict/pay[8]_i_1/O
-                         net (fo=1, unplaced)         0.000    15.353    u_aim_predict/pay[8]_i_1_n_0
-                         FDCE                                         r  u_aim_predict/pay_reg[8]/D
+                                                      0.418     3.755 r  u_median/mem_reg_0_255_0_0_i_195/CO[3]
+                         net (fo=8, unplaced)         0.808     4.563    u_median/u_color_seg/mx2
+                         LUT6 (Prop_lut6_I4_O)        0.105     4.668 f  u_median/mem_reg_0_255_0_0_i_122/O
+                         net (fo=14, unplaced)        0.398     5.066    u_median/dout_reg[11]_0
+                         LUT3 (Prop_lut3_I0_O)        0.105     5.171 r  u_median/mem_reg_0_255_0_0_i_208/O
+                         net (fo=3, unplaced)         0.365     5.536    u_median/mem_reg_0_255_0_0_i_208_n_0
+                         LUT6 (Prop_lut6_I5_O)        0.105     5.641 r  u_median/mem_reg_0_255_0_0_i_137/O
+                         net (fo=1, unplaced)         0.367     6.008    u_median/mem_reg_0_255_0_0_i_137_n_0
+                         CARRY4 (Prop_carry4_DI[3]_CO[3])
+                                                      0.318     6.326 r  u_median/mem_reg_0_255_0_0_i_62/CO[3]
+                         net (fo=1, unplaced)         0.008     6.334    u_median/mem_reg_0_255_0_0_i_62_n_0
+                         CARRY4 (Prop_carry4_CI_O[1])
+                                                      0.277     6.611 r  u_median/mem_reg_0_255_0_0_i_165/O[1]
+                         net (fo=2, unplaced)         0.483     7.094    u_reg_file/mem_reg_0_255_0_0_i_87_1[1]
+                         LUT5 (Prop_lut5_I3_O)        0.266     7.360 r  u_reg_file/mem_reg_0_255_0_0_i_164/O
+                         net (fo=3, unplaced)         0.365     7.725    u_reg_file/reg_written_reg_rep_0
+                         LUT6 (Prop_lut6_I0_O)        0.105     7.830 r  u_reg_file/mem_reg_0_255_0_0_i_85/O
+                         net (fo=1, unplaced)         0.537     8.367    u_reg_file/mem_reg_0_255_0_0_i_85_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.418     8.785 r  u_reg_file/mem_reg_0_255_0_0_i_38/CO[3]
+                         net (fo=1, unplaced)         0.000     8.785    u_reg_file/mem_reg_0_255_0_0_i_38_n_0
+                         CARRY4 (Prop_carry4_CI_O[1])
+                                                      0.277     9.062 f  u_reg_file/mem_reg_0_255_0_0_i_34/O[1]
+                         net (fo=2, unplaced)         0.483     9.545    u_dilate/gen_line_buf[0].u_line_buffer/mx_sat[11]
+                         LUT4 (Prop_lut4_I1_O)        0.268     9.813 r  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_8/O
+                         net (fo=1, unplaced)         0.000     9.813    u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_8_n_0
+                         CARRY4 (Prop_carry4_DI[2]_CO[3])
+                                                      0.352    10.165 f  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_2__0/CO[3]
+                         net (fo=2, unplaced)         0.781    10.946    u_median/hsr_reg[0][0][0]
+                         LUT4 (Prop_lut4_I0_O)        0.105    11.051 f  u_median/mem_reg_0_255_0_0_i_1__1/O
+                         net (fo=14, unplaced)        0.398    11.449    u_dilate/gen_line_buf[0].u_line_buffer/seg_mask
+                         LUT5 (Prop_lut5_I0_O)        0.105    11.554 f  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_3__0/O
+                         net (fo=1, unplaced)         0.347    11.901    u_dilate/gen_line_buf[6].u_line_buffer/hsr_reg[0][0]
+                         LUT6 (Prop_lut6_I5_O)        0.105    12.006 f  u_dilate/gen_line_buf[6].u_line_buffer/mem_reg_0_255_0_0_i_1__23/O
+                         net (fo=15, unplaced)        0.400    12.406    u_erode/gen_line_buf[2].u_line_buffer/dil_mask
+                         LUT2 (Prop_lut2_I1_O)        0.105    12.511 f  u_erode/gen_line_buf[2].u_line_buffer/mask_d1_i_1/O
+                         net (fo=6, unplaced)         0.379    12.890    u_reg_file/mask_d
+                         LUT6 (Prop_lut6_I0_O)        0.105    12.995 f  u_reg_file/in_run_i_2/O
+                         net (fo=4, unplaced)         0.371    13.366    u_reg_file/mask_t
+                         LUT5 (Prop_lut5_I0_O)        0.105    13.471 r  u_reg_file/emit_y[9]_i_1/O
+                         net (fo=31, unplaced)        0.436    13.907    u_blob_track/E[0]
+                         FDCE                                         r  u_blob_track/emit_x0_reg[0]/CE
   -------------------------------------------------------------------    -------------------
 
                          (clock ooc_clk rise edge)   20.000    20.000 r  
                                                       0.000    20.000 r  clk (IN)
-                         net (fo=5597, unset)         0.748    20.748    u_aim_predict/clk
-                         FDCE                                         r  u_aim_predict/pay_reg[8]/C
+                         net (fo=5892, unset)         0.748    20.748    u_blob_track/clk
+                         FDCE                                         r  u_blob_track/emit_x0_reg[0]/C
                          clock pessimism              0.000    20.748    
                          clock uncertainty           -0.035    20.712    
-                         FDCE (Setup_fdce_C_D)        0.029    20.741    u_aim_predict/pay_reg[8]
+                         FDCE (Setup_fdce_C_CE)      -0.165    20.547    u_blob_track/emit_x0_reg[0]
   -------------------------------------------------------------------
-                         required time                         20.741    
-                         arrival time                         -15.353    
+                         required time                         20.547    
+                         arrival time                         -13.907    
   -------------------------------------------------------------------
-                         slack                                  5.388    
+                         slack                                  6.640    
 
-Slack (MET) :             5.388ns  (required time - arrival time)
-  Source:                 u_blob_track/center_y_reg[1]/C
+Slack (MET) :             6.640ns  (required time - arrival time)
+  Source:                 u_median/dout_reg[5]/C
                             (rising edge-triggered cell FDCE clocked by ooc_clk  {rise@0.000ns fall@10.000ns period=20.000ns})
-  Destination:            u_aim_predict/pay_reg[9]/D
+  Destination:            u_blob_track/emit_x0_reg[1]/CE
                             (rising edge-triggered cell FDCE clocked by ooc_clk  {rise@0.000ns fall@10.000ns period=20.000ns})
   Path Group:             ooc_clk
   Path Type:              Setup (Max at Slow Process Corner)
   Requirement:            20.000ns  (ooc_clk rise@20.000ns - ooc_clk rise@0.000ns)
-  Data Path Delay:        14.566ns  (logic 9.233ns (63.387%)  route 5.333ns (36.613%))
-  Logic Levels:           22  (CARRY4=14 DSP48E1=1 LUT2=4 LUT3=1 LUT6=2)
+  Data Path Delay:        13.120ns  (logic 4.379ns (33.377%)  route 8.741ns (66.623%))
+  Logic Levels:           20  (CARRY4=6 LUT2=1 LUT3=2 LUT4=2 LUT5=3 LUT6=6)
   Clock Path Skew:        -0.039ns (DCD - SCD + CPR)
     Destination Clock Delay (DCD):    0.748ns = ( 20.748 - 20.000 ) 
     Source Clock Delay      (SCD):    0.787ns
@@ -318,96 +305,83 @@ Slack (MET) :             5.388ns  (required time - arrival time)
   -------------------------------------------------------------------    -------------------
                          (clock ooc_clk rise edge)    0.000     0.000 r  
                                                       0.000     0.000 r  clk (IN)
-                         net (fo=5597, unset)         0.787     0.787    u_blob_track/clk
-                         FDCE                                         r  u_blob_track/center_y_reg[1]/C
+                         net (fo=5892, unset)         0.787     0.787    u_median/clk
+                         FDCE                                         r  u_median/dout_reg[5]/C
   -------------------------------------------------------------------    -------------------
-                         FDCE (Prop_fdce_C_Q)         0.379     1.166 r  u_blob_track/center_y_reg[1]/Q
-                         net (fo=11, unplaced)        0.408     1.574    u_blob_track/center_y_reg[9]_0[1]
-                         LUT2 (Prop_lut2_I0_O)        0.232     1.806 r  u_blob_track/vy_s[7]_i_15/O
-                         net (fo=1, unplaced)         0.000     1.806    u_blob_track/vy_s[7]_i_15_n_0
-                         CARRY4 (Prop_carry4_S[1]_CO[3])
-                                                      0.457     2.263 r  u_blob_track/vy_s_reg[7]_i_8/CO[3]
-                         net (fo=1, unplaced)         0.008     2.271    u_blob_track/vy_s_reg[7]_i_8_n_0
-                         CARRY4 (Prop_carry4_CI_O[0])
-                                                      0.191     2.462 r  u_blob_track/vy_s_reg[15]_i_14/O[0]
-                         net (fo=2, unplaced)         0.552     3.014    u_aim_predict/dy40[4]
-                         CARRY4 (Prop_carry4_DI[3]_CO[3])
-                                                      0.451     3.465 r  u_aim_predict/vy_s_reg[7]_i_7/CO[3]
-                         net (fo=1, unplaced)         0.000     3.465    u_aim_predict/vy_s_reg[7]_i_7_n_0
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275     3.740 r  u_aim_predict/vy_s_reg[15]_i_9/O[3]
-                         net (fo=1, unplaced)         0.519     4.259    u_aim_predict/vy_s_reg[15]_i_9_n_4
-                         LUT2 (Prop_lut2_I1_O)        0.250     4.509 r  u_aim_predict/vy_s[11]_i_4/O
-                         net (fo=1, unplaced)         0.000     4.509    u_aim_predict/vy_s[11]_i_4_n_0
-                         CARRY4 (Prop_carry4_S[2]_CO[3])
-                                                      0.332     4.841 r  u_aim_predict/vy_s_reg[11]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.000     4.841    u_aim_predict/vy_s_reg[11]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275     5.116 r  u_aim_predict/vy_s_reg[15]_i_2/O[3]
-                         net (fo=17, unplaced)        0.575     5.691    u_aim_predict/nvy[15]
-                         LUT3 (Prop_lut3_I2_O)        0.250     5.941 r  u_aim_predict/vy_s[15]_i_1/O
-                         net (fo=16, unplaced)        0.646     6.587    u_aim_predict/vyn[15]
-                         DSP48E1 (Prop_dsp48e1_A[29]_P[9])
-                                                      3.230     9.817 r  u_aim_predict/muly/P[9]
-                         net (fo=1, unplaced)         0.646    10.462    u_blob_track/pcy_reg[9][1]
-                         LUT2 (Prop_lut2_I1_O)        0.105    10.567 r  u_blob_track/pcy[3]_i_5/O
-                         net (fo=1, unplaced)         0.000    10.567    u_blob_track/pcy[3]_i_5_n_0
-                         CARRY4 (Prop_carry4_S[1]_CO[3])
-                                                      0.457    11.024 r  u_blob_track/pcy_reg[3]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.008    11.032    u_blob_track/pcy_reg[3]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    11.130 r  u_blob_track/pcy_reg[7]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.000    11.130    u_blob_track/pcy_reg[7]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    11.228 r  u_blob_track/pcy_reg[9]_i_3/CO[3]
-                         net (fo=1, unplaced)         0.000    11.228    u_aim_predict/pcy_reg[0]_0[0]
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275    11.503 f  u_aim_predict/pcy_reg[9]_i_4/O[3]
-                         net (fo=41, unplaced)        0.596    12.099    u_aim_predict_n_72
-                         LUT2 (Prop_lut2_I1_O)        0.253    12.352 r  pcy[9]_i_6/O
-                         net (fo=1, unplaced)         0.000    12.352    pcy[9]_i_6_n_0
-                         CARRY4 (Prop_carry4_DI[1]_CO[1])
-                                                      0.406    12.758 r  pcy_reg[9]_i_2/CO[1]
-                         net (fo=39, unplaced)        0.316    13.074    u_aim_predict/CO[0]
-                         LUT6 (Prop_lut6_I4_O)        0.277    13.351 r  u_aim_predict/pay[9]_i_31/O
-                         net (fo=1, unplaced)         0.537    13.888    u_aim_predict/pay[9]_i_31_n_0
+                         FDCE (Prop_fdce_C_Q)         0.379     1.166 r  u_median/dout_reg[5]/Q
+                         net (fo=11, unplaced)        0.645     1.811    u_median/dout_reg[5]_0[0]
+                         LUT3 (Prop_lut3_I0_O)        0.251     2.062 r  u_median/hgr_reg_0_127_0_0_i_42/O
+                         net (fo=14, unplaced)        0.633     2.695    u_median/pix_seg[5]
+                         LUT6 (Prop_lut6_I0_O)        0.105     2.800 r  u_median/mem_reg_0_255_0_0_i_255/O
+                         net (fo=1, unplaced)         0.537     3.337    u_median/mem_reg_0_255_0_0_i_255_n_0
                          CARRY4 (Prop_carry4_DI[1]_CO[3])
-                                                      0.418    14.306 r  u_aim_predict/pay_reg[9]_i_17/CO[3]
-                         net (fo=1, unplaced)         0.008    14.314    u_aim_predict/pay_reg[9]_i_17_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    14.412 r  u_aim_predict/pay_reg[9]_i_6/CO[3]
-                         net (fo=1, unplaced)         0.000    14.412    u_aim_predict/pay_reg[9]_i_6_n_0
-                         CARRY4 (Prop_carry4_CI_CO[1])
-                                                      0.149    14.561 r  u_aim_predict/pay_reg[9]_i_2/CO[1]
-                         net (fo=10, unplaced)        0.515    15.076    u_aim_predict/pay_p1
-                         LUT6 (Prop_lut6_I0_O)        0.277    15.353 r  u_aim_predict/pay[9]_i_1/O
-                         net (fo=1, unplaced)         0.000    15.353    u_aim_predict/pay[9]_i_1_n_0
-                         FDCE                                         r  u_aim_predict/pay_reg[9]/D
+                                                      0.418     3.755 r  u_median/mem_reg_0_255_0_0_i_195/CO[3]
+                         net (fo=8, unplaced)         0.808     4.563    u_median/u_color_seg/mx2
+                         LUT6 (Prop_lut6_I4_O)        0.105     4.668 f  u_median/mem_reg_0_255_0_0_i_122/O
+                         net (fo=14, unplaced)        0.398     5.066    u_median/dout_reg[11]_0
+                         LUT3 (Prop_lut3_I0_O)        0.105     5.171 r  u_median/mem_reg_0_255_0_0_i_208/O
+                         net (fo=3, unplaced)         0.365     5.536    u_median/mem_reg_0_255_0_0_i_208_n_0
+                         LUT6 (Prop_lut6_I5_O)        0.105     5.641 r  u_median/mem_reg_0_255_0_0_i_137/O
+                         net (fo=1, unplaced)         0.367     6.008    u_median/mem_reg_0_255_0_0_i_137_n_0
+                         CARRY4 (Prop_carry4_DI[3]_CO[3])
+                                                      0.318     6.326 r  u_median/mem_reg_0_255_0_0_i_62/CO[3]
+                         net (fo=1, unplaced)         0.008     6.334    u_median/mem_reg_0_255_0_0_i_62_n_0
+                         CARRY4 (Prop_carry4_CI_O[1])
+                                                      0.277     6.611 r  u_median/mem_reg_0_255_0_0_i_165/O[1]
+                         net (fo=2, unplaced)         0.483     7.094    u_reg_file/mem_reg_0_255_0_0_i_87_1[1]
+                         LUT5 (Prop_lut5_I3_O)        0.266     7.360 r  u_reg_file/mem_reg_0_255_0_0_i_164/O
+                         net (fo=3, unplaced)         0.365     7.725    u_reg_file/reg_written_reg_rep_0
+                         LUT6 (Prop_lut6_I0_O)        0.105     7.830 r  u_reg_file/mem_reg_0_255_0_0_i_85/O
+                         net (fo=1, unplaced)         0.537     8.367    u_reg_file/mem_reg_0_255_0_0_i_85_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.418     8.785 r  u_reg_file/mem_reg_0_255_0_0_i_38/CO[3]
+                         net (fo=1, unplaced)         0.000     8.785    u_reg_file/mem_reg_0_255_0_0_i_38_n_0
+                         CARRY4 (Prop_carry4_CI_O[1])
+                                                      0.277     9.062 f  u_reg_file/mem_reg_0_255_0_0_i_34/O[1]
+                         net (fo=2, unplaced)         0.483     9.545    u_dilate/gen_line_buf[0].u_line_buffer/mx_sat[11]
+                         LUT4 (Prop_lut4_I1_O)        0.268     9.813 r  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_8/O
+                         net (fo=1, unplaced)         0.000     9.813    u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_8_n_0
+                         CARRY4 (Prop_carry4_DI[2]_CO[3])
+                                                      0.352    10.165 f  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_2__0/CO[3]
+                         net (fo=2, unplaced)         0.781    10.946    u_median/hsr_reg[0][0][0]
+                         LUT4 (Prop_lut4_I0_O)        0.105    11.051 f  u_median/mem_reg_0_255_0_0_i_1__1/O
+                         net (fo=14, unplaced)        0.398    11.449    u_dilate/gen_line_buf[0].u_line_buffer/seg_mask
+                         LUT5 (Prop_lut5_I0_O)        0.105    11.554 f  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_3__0/O
+                         net (fo=1, unplaced)         0.347    11.901    u_dilate/gen_line_buf[6].u_line_buffer/hsr_reg[0][0]
+                         LUT6 (Prop_lut6_I5_O)        0.105    12.006 f  u_dilate/gen_line_buf[6].u_line_buffer/mem_reg_0_255_0_0_i_1__23/O
+                         net (fo=15, unplaced)        0.400    12.406    u_erode/gen_line_buf[2].u_line_buffer/dil_mask
+                         LUT2 (Prop_lut2_I1_O)        0.105    12.511 f  u_erode/gen_line_buf[2].u_line_buffer/mask_d1_i_1/O
+                         net (fo=6, unplaced)         0.379    12.890    u_reg_file/mask_d
+                         LUT6 (Prop_lut6_I0_O)        0.105    12.995 f  u_reg_file/in_run_i_2/O
+                         net (fo=4, unplaced)         0.371    13.366    u_reg_file/mask_t
+                         LUT5 (Prop_lut5_I0_O)        0.105    13.471 r  u_reg_file/emit_y[9]_i_1/O
+                         net (fo=31, unplaced)        0.436    13.907    u_blob_track/E[0]
+                         FDCE                                         r  u_blob_track/emit_x0_reg[1]/CE
   -------------------------------------------------------------------    -------------------
 
                          (clock ooc_clk rise edge)   20.000    20.000 r  
                                                       0.000    20.000 r  clk (IN)
-                         net (fo=5597, unset)         0.748    20.748    u_aim_predict/clk
-                         FDCE                                         r  u_aim_predict/pay_reg[9]/C
+                         net (fo=5892, unset)         0.748    20.748    u_blob_track/clk
+                         FDCE                                         r  u_blob_track/emit_x0_reg[1]/C
                          clock pessimism              0.000    20.748    
                          clock uncertainty           -0.035    20.712    
-                         FDCE (Setup_fdce_C_D)        0.029    20.741    u_aim_predict/pay_reg[9]
+                         FDCE (Setup_fdce_C_CE)      -0.165    20.547    u_blob_track/emit_x0_reg[1]
   -------------------------------------------------------------------
-                         required time                         20.741    
-                         arrival time                         -15.353    
+                         required time                         20.547    
+                         arrival time                         -13.907    
   -------------------------------------------------------------------
-                         slack                                  5.388    
+                         slack                                  6.640    
 
-Slack (MET) :             5.620ns  (required time - arrival time)
-  Source:                 u_blob_track/center_y_reg[1]/C
+Slack (MET) :             6.640ns  (required time - arrival time)
+  Source:                 u_median/dout_reg[5]/C
                             (rising edge-triggered cell FDCE clocked by ooc_clk  {rise@0.000ns fall@10.000ns period=20.000ns})
-  Destination:            u_aim_predict/pay_reg[0]/D
+  Destination:            u_blob_track/emit_x0_reg[2]/CE
                             (rising edge-triggered cell FDCE clocked by ooc_clk  {rise@0.000ns fall@10.000ns period=20.000ns})
   Path Group:             ooc_clk
   Path Type:              Setup (Max at Slow Process Corner)
   Requirement:            20.000ns  (ooc_clk rise@20.000ns - ooc_clk rise@0.000ns)
-  Data Path Delay:        14.334ns  (logic 9.233ns (64.413%)  route 5.101ns (35.587%))
-  Logic Levels:           22  (CARRY4=14 DSP48E1=1 LUT2=4 LUT3=1 LUT6=2)
+  Data Path Delay:        13.120ns  (logic 4.379ns (33.377%)  route 8.741ns (66.623%))
+  Logic Levels:           20  (CARRY4=6 LUT2=1 LUT3=2 LUT4=2 LUT5=3 LUT6=6)
   Clock Path Skew:        -0.039ns (DCD - SCD + CPR)
     Destination Clock Delay (DCD):    0.748ns = ( 20.748 - 20.000 ) 
     Source Clock Delay      (SCD):    0.787ns
@@ -422,96 +396,83 @@ Slack (MET) :             5.620ns  (required time - arrival time)
   -------------------------------------------------------------------    -------------------
                          (clock ooc_clk rise edge)    0.000     0.000 r  
                                                       0.000     0.000 r  clk (IN)
-                         net (fo=5597, unset)         0.787     0.787    u_blob_track/clk
-                         FDCE                                         r  u_blob_track/center_y_reg[1]/C
+                         net (fo=5892, unset)         0.787     0.787    u_median/clk
+                         FDCE                                         r  u_median/dout_reg[5]/C
   -------------------------------------------------------------------    -------------------
-                         FDCE (Prop_fdce_C_Q)         0.379     1.166 r  u_blob_track/center_y_reg[1]/Q
-                         net (fo=11, unplaced)        0.408     1.574    u_blob_track/center_y_reg[9]_0[1]
-                         LUT2 (Prop_lut2_I0_O)        0.232     1.806 r  u_blob_track/vy_s[7]_i_15/O
-                         net (fo=1, unplaced)         0.000     1.806    u_blob_track/vy_s[7]_i_15_n_0
-                         CARRY4 (Prop_carry4_S[1]_CO[3])
-                                                      0.457     2.263 r  u_blob_track/vy_s_reg[7]_i_8/CO[3]
-                         net (fo=1, unplaced)         0.008     2.271    u_blob_track/vy_s_reg[7]_i_8_n_0
-                         CARRY4 (Prop_carry4_CI_O[0])
-                                                      0.191     2.462 r  u_blob_track/vy_s_reg[15]_i_14/O[0]
-                         net (fo=2, unplaced)         0.552     3.014    u_aim_predict/dy40[4]
-                         CARRY4 (Prop_carry4_DI[3]_CO[3])
-                                                      0.451     3.465 r  u_aim_predict/vy_s_reg[7]_i_7/CO[3]
-                         net (fo=1, unplaced)         0.000     3.465    u_aim_predict/vy_s_reg[7]_i_7_n_0
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275     3.740 r  u_aim_predict/vy_s_reg[15]_i_9/O[3]
-                         net (fo=1, unplaced)         0.519     4.259    u_aim_predict/vy_s_reg[15]_i_9_n_4
-                         LUT2 (Prop_lut2_I1_O)        0.250     4.509 r  u_aim_predict/vy_s[11]_i_4/O
-                         net (fo=1, unplaced)         0.000     4.509    u_aim_predict/vy_s[11]_i_4_n_0
-                         CARRY4 (Prop_carry4_S[2]_CO[3])
-                                                      0.332     4.841 r  u_aim_predict/vy_s_reg[11]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.000     4.841    u_aim_predict/vy_s_reg[11]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275     5.116 r  u_aim_predict/vy_s_reg[15]_i_2/O[3]
-                         net (fo=17, unplaced)        0.575     5.691    u_aim_predict/nvy[15]
-                         LUT3 (Prop_lut3_I2_O)        0.250     5.941 r  u_aim_predict/vy_s[15]_i_1/O
-                         net (fo=16, unplaced)        0.646     6.587    u_aim_predict/vyn[15]
-                         DSP48E1 (Prop_dsp48e1_A[29]_P[9])
-                                                      3.230     9.817 r  u_aim_predict/muly/P[9]
-                         net (fo=1, unplaced)         0.646    10.462    u_blob_track/pcy_reg[9][1]
-                         LUT2 (Prop_lut2_I1_O)        0.105    10.567 r  u_blob_track/pcy[3]_i_5/O
-                         net (fo=1, unplaced)         0.000    10.567    u_blob_track/pcy[3]_i_5_n_0
-                         CARRY4 (Prop_carry4_S[1]_CO[3])
-                                                      0.457    11.024 r  u_blob_track/pcy_reg[3]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.008    11.032    u_blob_track/pcy_reg[3]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    11.130 r  u_blob_track/pcy_reg[7]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.000    11.130    u_blob_track/pcy_reg[7]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    11.228 r  u_blob_track/pcy_reg[9]_i_3/CO[3]
-                         net (fo=1, unplaced)         0.000    11.228    u_aim_predict/pcy_reg[0]_0[0]
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275    11.503 f  u_aim_predict/pcy_reg[9]_i_4/O[3]
-                         net (fo=41, unplaced)        0.596    12.099    u_aim_predict_n_72
-                         LUT2 (Prop_lut2_I1_O)        0.253    12.352 r  pcy[9]_i_6/O
-                         net (fo=1, unplaced)         0.000    12.352    pcy[9]_i_6_n_0
-                         CARRY4 (Prop_carry4_DI[1]_CO[1])
-                                                      0.406    12.758 r  pcy_reg[9]_i_2/CO[1]
-                         net (fo=39, unplaced)        0.316    13.074    u_aim_predict/CO[0]
-                         LUT6 (Prop_lut6_I4_O)        0.277    13.351 r  u_aim_predict/pay[9]_i_31/O
-                         net (fo=1, unplaced)         0.537    13.888    u_aim_predict/pay[9]_i_31_n_0
+                         FDCE (Prop_fdce_C_Q)         0.379     1.166 r  u_median/dout_reg[5]/Q
+                         net (fo=11, unplaced)        0.645     1.811    u_median/dout_reg[5]_0[0]
+                         LUT3 (Prop_lut3_I0_O)        0.251     2.062 r  u_median/hgr_reg_0_127_0_0_i_42/O
+                         net (fo=14, unplaced)        0.633     2.695    u_median/pix_seg[5]
+                         LUT6 (Prop_lut6_I0_O)        0.105     2.800 r  u_median/mem_reg_0_255_0_0_i_255/O
+                         net (fo=1, unplaced)         0.537     3.337    u_median/mem_reg_0_255_0_0_i_255_n_0
                          CARRY4 (Prop_carry4_DI[1]_CO[3])
-                                                      0.418    14.306 r  u_aim_predict/pay_reg[9]_i_17/CO[3]
-                         net (fo=1, unplaced)         0.008    14.314    u_aim_predict/pay_reg[9]_i_17_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    14.412 r  u_aim_predict/pay_reg[9]_i_6/CO[3]
-                         net (fo=1, unplaced)         0.000    14.412    u_aim_predict/pay_reg[9]_i_6_n_0
-                         CARRY4 (Prop_carry4_CI_CO[1])
-                                                      0.149    14.561 r  u_aim_predict/pay_reg[9]_i_2/CO[1]
-                         net (fo=10, unplaced)        0.283    14.844    u_aim_predict/pay_p1
-                         LUT6 (Prop_lut6_I0_O)        0.277    15.121 r  u_aim_predict/pay[0]_i_1/O
-                         net (fo=1, unplaced)         0.000    15.121    u_aim_predict/pay[0]_i_1_n_0
-                         FDCE                                         r  u_aim_predict/pay_reg[0]/D
+                                                      0.418     3.755 r  u_median/mem_reg_0_255_0_0_i_195/CO[3]
+                         net (fo=8, unplaced)         0.808     4.563    u_median/u_color_seg/mx2
+                         LUT6 (Prop_lut6_I4_O)        0.105     4.668 f  u_median/mem_reg_0_255_0_0_i_122/O
+                         net (fo=14, unplaced)        0.398     5.066    u_median/dout_reg[11]_0
+                         LUT3 (Prop_lut3_I0_O)        0.105     5.171 r  u_median/mem_reg_0_255_0_0_i_208/O
+                         net (fo=3, unplaced)         0.365     5.536    u_median/mem_reg_0_255_0_0_i_208_n_0
+                         LUT6 (Prop_lut6_I5_O)        0.105     5.641 r  u_median/mem_reg_0_255_0_0_i_137/O
+                         net (fo=1, unplaced)         0.367     6.008    u_median/mem_reg_0_255_0_0_i_137_n_0
+                         CARRY4 (Prop_carry4_DI[3]_CO[3])
+                                                      0.318     6.326 r  u_median/mem_reg_0_255_0_0_i_62/CO[3]
+                         net (fo=1, unplaced)         0.008     6.334    u_median/mem_reg_0_255_0_0_i_62_n_0
+                         CARRY4 (Prop_carry4_CI_O[1])
+                                                      0.277     6.611 r  u_median/mem_reg_0_255_0_0_i_165/O[1]
+                         net (fo=2, unplaced)         0.483     7.094    u_reg_file/mem_reg_0_255_0_0_i_87_1[1]
+                         LUT5 (Prop_lut5_I3_O)        0.266     7.360 r  u_reg_file/mem_reg_0_255_0_0_i_164/O
+                         net (fo=3, unplaced)         0.365     7.725    u_reg_file/reg_written_reg_rep_0
+                         LUT6 (Prop_lut6_I0_O)        0.105     7.830 r  u_reg_file/mem_reg_0_255_0_0_i_85/O
+                         net (fo=1, unplaced)         0.537     8.367    u_reg_file/mem_reg_0_255_0_0_i_85_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.418     8.785 r  u_reg_file/mem_reg_0_255_0_0_i_38/CO[3]
+                         net (fo=1, unplaced)         0.000     8.785    u_reg_file/mem_reg_0_255_0_0_i_38_n_0
+                         CARRY4 (Prop_carry4_CI_O[1])
+                                                      0.277     9.062 f  u_reg_file/mem_reg_0_255_0_0_i_34/O[1]
+                         net (fo=2, unplaced)         0.483     9.545    u_dilate/gen_line_buf[0].u_line_buffer/mx_sat[11]
+                         LUT4 (Prop_lut4_I1_O)        0.268     9.813 r  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_8/O
+                         net (fo=1, unplaced)         0.000     9.813    u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_8_n_0
+                         CARRY4 (Prop_carry4_DI[2]_CO[3])
+                                                      0.352    10.165 f  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_2__0/CO[3]
+                         net (fo=2, unplaced)         0.781    10.946    u_median/hsr_reg[0][0][0]
+                         LUT4 (Prop_lut4_I0_O)        0.105    11.051 f  u_median/mem_reg_0_255_0_0_i_1__1/O
+                         net (fo=14, unplaced)        0.398    11.449    u_dilate/gen_line_buf[0].u_line_buffer/seg_mask
+                         LUT5 (Prop_lut5_I0_O)        0.105    11.554 f  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_3__0/O
+                         net (fo=1, unplaced)         0.347    11.901    u_dilate/gen_line_buf[6].u_line_buffer/hsr_reg[0][0]
+                         LUT6 (Prop_lut6_I5_O)        0.105    12.006 f  u_dilate/gen_line_buf[6].u_line_buffer/mem_reg_0_255_0_0_i_1__23/O
+                         net (fo=15, unplaced)        0.400    12.406    u_erode/gen_line_buf[2].u_line_buffer/dil_mask
+                         LUT2 (Prop_lut2_I1_O)        0.105    12.511 f  u_erode/gen_line_buf[2].u_line_buffer/mask_d1_i_1/O
+                         net (fo=6, unplaced)         0.379    12.890    u_reg_file/mask_d
+                         LUT6 (Prop_lut6_I0_O)        0.105    12.995 f  u_reg_file/in_run_i_2/O
+                         net (fo=4, unplaced)         0.371    13.366    u_reg_file/mask_t
+                         LUT5 (Prop_lut5_I0_O)        0.105    13.471 r  u_reg_file/emit_y[9]_i_1/O
+                         net (fo=31, unplaced)        0.436    13.907    u_blob_track/E[0]
+                         FDCE                                         r  u_blob_track/emit_x0_reg[2]/CE
   -------------------------------------------------------------------    -------------------
 
                          (clock ooc_clk rise edge)   20.000    20.000 r  
                                                       0.000    20.000 r  clk (IN)
-                         net (fo=5597, unset)         0.748    20.748    u_aim_predict/clk
-                         FDCE                                         r  u_aim_predict/pay_reg[0]/C
+                         net (fo=5892, unset)         0.748    20.748    u_blob_track/clk
+                         FDCE                                         r  u_blob_track/emit_x0_reg[2]/C
                          clock pessimism              0.000    20.748    
                          clock uncertainty           -0.035    20.712    
-                         FDCE (Setup_fdce_C_D)        0.029    20.741    u_aim_predict/pay_reg[0]
+                         FDCE (Setup_fdce_C_CE)      -0.165    20.547    u_blob_track/emit_x0_reg[2]
   -------------------------------------------------------------------
-                         required time                         20.741    
-                         arrival time                         -15.121    
+                         required time                         20.547    
+                         arrival time                         -13.907    
   -------------------------------------------------------------------
-                         slack                                  5.620    
+                         slack                                  6.640    
 
-Slack (MET) :             5.620ns  (required time - arrival time)
-  Source:                 u_blob_track/center_y_reg[1]/C
+Slack (MET) :             6.640ns  (required time - arrival time)
+  Source:                 u_median/dout_reg[5]/C
                             (rising edge-triggered cell FDCE clocked by ooc_clk  {rise@0.000ns fall@10.000ns period=20.000ns})
-  Destination:            u_aim_predict/pay_reg[1]/D
+  Destination:            u_blob_track/emit_x0_reg[3]/CE
                             (rising edge-triggered cell FDCE clocked by ooc_clk  {rise@0.000ns fall@10.000ns period=20.000ns})
   Path Group:             ooc_clk
   Path Type:              Setup (Max at Slow Process Corner)
   Requirement:            20.000ns  (ooc_clk rise@20.000ns - ooc_clk rise@0.000ns)
-  Data Path Delay:        14.334ns  (logic 9.233ns (64.413%)  route 5.101ns (35.587%))
-  Logic Levels:           22  (CARRY4=14 DSP48E1=1 LUT2=4 LUT3=1 LUT6=2)
+  Data Path Delay:        13.120ns  (logic 4.379ns (33.377%)  route 8.741ns (66.623%))
+  Logic Levels:           20  (CARRY4=6 LUT2=1 LUT3=2 LUT4=2 LUT5=3 LUT6=6)
   Clock Path Skew:        -0.039ns (DCD - SCD + CPR)
     Destination Clock Delay (DCD):    0.748ns = ( 20.748 - 20.000 ) 
     Source Clock Delay      (SCD):    0.787ns
@@ -526,96 +487,83 @@ Slack (MET) :             5.620ns  (required time - arrival time)
   -------------------------------------------------------------------    -------------------
                          (clock ooc_clk rise edge)    0.000     0.000 r  
                                                       0.000     0.000 r  clk (IN)
-                         net (fo=5597, unset)         0.787     0.787    u_blob_track/clk
-                         FDCE                                         r  u_blob_track/center_y_reg[1]/C
+                         net (fo=5892, unset)         0.787     0.787    u_median/clk
+                         FDCE                                         r  u_median/dout_reg[5]/C
   -------------------------------------------------------------------    -------------------
-                         FDCE (Prop_fdce_C_Q)         0.379     1.166 r  u_blob_track/center_y_reg[1]/Q
-                         net (fo=11, unplaced)        0.408     1.574    u_blob_track/center_y_reg[9]_0[1]
-                         LUT2 (Prop_lut2_I0_O)        0.232     1.806 r  u_blob_track/vy_s[7]_i_15/O
-                         net (fo=1, unplaced)         0.000     1.806    u_blob_track/vy_s[7]_i_15_n_0
-                         CARRY4 (Prop_carry4_S[1]_CO[3])
-                                                      0.457     2.263 r  u_blob_track/vy_s_reg[7]_i_8/CO[3]
-                         net (fo=1, unplaced)         0.008     2.271    u_blob_track/vy_s_reg[7]_i_8_n_0
-                         CARRY4 (Prop_carry4_CI_O[0])
-                                                      0.191     2.462 r  u_blob_track/vy_s_reg[15]_i_14/O[0]
-                         net (fo=2, unplaced)         0.552     3.014    u_aim_predict/dy40[4]
-                         CARRY4 (Prop_carry4_DI[3]_CO[3])
-                                                      0.451     3.465 r  u_aim_predict/vy_s_reg[7]_i_7/CO[3]
-                         net (fo=1, unplaced)         0.000     3.465    u_aim_predict/vy_s_reg[7]_i_7_n_0
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275     3.740 r  u_aim_predict/vy_s_reg[15]_i_9/O[3]
-                         net (fo=1, unplaced)         0.519     4.259    u_aim_predict/vy_s_reg[15]_i_9_n_4
-                         LUT2 (Prop_lut2_I1_O)        0.250     4.509 r  u_aim_predict/vy_s[11]_i_4/O
-                         net (fo=1, unplaced)         0.000     4.509    u_aim_predict/vy_s[11]_i_4_n_0
-                         CARRY4 (Prop_carry4_S[2]_CO[3])
-                                                      0.332     4.841 r  u_aim_predict/vy_s_reg[11]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.000     4.841    u_aim_predict/vy_s_reg[11]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275     5.116 r  u_aim_predict/vy_s_reg[15]_i_2/O[3]
-                         net (fo=17, unplaced)        0.575     5.691    u_aim_predict/nvy[15]
-                         LUT3 (Prop_lut3_I2_O)        0.250     5.941 r  u_aim_predict/vy_s[15]_i_1/O
-                         net (fo=16, unplaced)        0.646     6.587    u_aim_predict/vyn[15]
-                         DSP48E1 (Prop_dsp48e1_A[29]_P[9])
-                                                      3.230     9.817 r  u_aim_predict/muly/P[9]
-                         net (fo=1, unplaced)         0.646    10.462    u_blob_track/pcy_reg[9][1]
-                         LUT2 (Prop_lut2_I1_O)        0.105    10.567 r  u_blob_track/pcy[3]_i_5/O
-                         net (fo=1, unplaced)         0.000    10.567    u_blob_track/pcy[3]_i_5_n_0
-                         CARRY4 (Prop_carry4_S[1]_CO[3])
-                                                      0.457    11.024 r  u_blob_track/pcy_reg[3]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.008    11.032    u_blob_track/pcy_reg[3]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    11.130 r  u_blob_track/pcy_reg[7]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.000    11.130    u_blob_track/pcy_reg[7]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    11.228 r  u_blob_track/pcy_reg[9]_i_3/CO[3]
-                         net (fo=1, unplaced)         0.000    11.228    u_aim_predict/pcy_reg[0]_0[0]
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275    11.503 f  u_aim_predict/pcy_reg[9]_i_4/O[3]
-                         net (fo=41, unplaced)        0.596    12.099    u_aim_predict_n_72
-                         LUT2 (Prop_lut2_I1_O)        0.253    12.352 r  pcy[9]_i_6/O
-                         net (fo=1, unplaced)         0.000    12.352    pcy[9]_i_6_n_0
-                         CARRY4 (Prop_carry4_DI[1]_CO[1])
-                                                      0.406    12.758 r  pcy_reg[9]_i_2/CO[1]
-                         net (fo=39, unplaced)        0.316    13.074    u_aim_predict/CO[0]
-                         LUT6 (Prop_lut6_I4_O)        0.277    13.351 r  u_aim_predict/pay[9]_i_31/O
-                         net (fo=1, unplaced)         0.537    13.888    u_aim_predict/pay[9]_i_31_n_0
+                         FDCE (Prop_fdce_C_Q)         0.379     1.166 r  u_median/dout_reg[5]/Q
+                         net (fo=11, unplaced)        0.645     1.811    u_median/dout_reg[5]_0[0]
+                         LUT3 (Prop_lut3_I0_O)        0.251     2.062 r  u_median/hgr_reg_0_127_0_0_i_42/O
+                         net (fo=14, unplaced)        0.633     2.695    u_median/pix_seg[5]
+                         LUT6 (Prop_lut6_I0_O)        0.105     2.800 r  u_median/mem_reg_0_255_0_0_i_255/O
+                         net (fo=1, unplaced)         0.537     3.337    u_median/mem_reg_0_255_0_0_i_255_n_0
                          CARRY4 (Prop_carry4_DI[1]_CO[3])
-                                                      0.418    14.306 r  u_aim_predict/pay_reg[9]_i_17/CO[3]
-                         net (fo=1, unplaced)         0.008    14.314    u_aim_predict/pay_reg[9]_i_17_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    14.412 r  u_aim_predict/pay_reg[9]_i_6/CO[3]
-                         net (fo=1, unplaced)         0.000    14.412    u_aim_predict/pay_reg[9]_i_6_n_0
-                         CARRY4 (Prop_carry4_CI_CO[1])
-                                                      0.149    14.561 r  u_aim_predict/pay_reg[9]_i_2/CO[1]
-                         net (fo=10, unplaced)        0.283    14.844    u_aim_predict/pay_p1
-                         LUT6 (Prop_lut6_I0_O)        0.277    15.121 r  u_aim_predict/pay[1]_i_1/O
-                         net (fo=1, unplaced)         0.000    15.121    u_aim_predict/pay[1]_i_1_n_0
-                         FDCE                                         r  u_aim_predict/pay_reg[1]/D
+                                                      0.418     3.755 r  u_median/mem_reg_0_255_0_0_i_195/CO[3]
+                         net (fo=8, unplaced)         0.808     4.563    u_median/u_color_seg/mx2
+                         LUT6 (Prop_lut6_I4_O)        0.105     4.668 f  u_median/mem_reg_0_255_0_0_i_122/O
+                         net (fo=14, unplaced)        0.398     5.066    u_median/dout_reg[11]_0
+                         LUT3 (Prop_lut3_I0_O)        0.105     5.171 r  u_median/mem_reg_0_255_0_0_i_208/O
+                         net (fo=3, unplaced)         0.365     5.536    u_median/mem_reg_0_255_0_0_i_208_n_0
+                         LUT6 (Prop_lut6_I5_O)        0.105     5.641 r  u_median/mem_reg_0_255_0_0_i_137/O
+                         net (fo=1, unplaced)         0.367     6.008    u_median/mem_reg_0_255_0_0_i_137_n_0
+                         CARRY4 (Prop_carry4_DI[3]_CO[3])
+                                                      0.318     6.326 r  u_median/mem_reg_0_255_0_0_i_62/CO[3]
+                         net (fo=1, unplaced)         0.008     6.334    u_median/mem_reg_0_255_0_0_i_62_n_0
+                         CARRY4 (Prop_carry4_CI_O[1])
+                                                      0.277     6.611 r  u_median/mem_reg_0_255_0_0_i_165/O[1]
+                         net (fo=2, unplaced)         0.483     7.094    u_reg_file/mem_reg_0_255_0_0_i_87_1[1]
+                         LUT5 (Prop_lut5_I3_O)        0.266     7.360 r  u_reg_file/mem_reg_0_255_0_0_i_164/O
+                         net (fo=3, unplaced)         0.365     7.725    u_reg_file/reg_written_reg_rep_0
+                         LUT6 (Prop_lut6_I0_O)        0.105     7.830 r  u_reg_file/mem_reg_0_255_0_0_i_85/O
+                         net (fo=1, unplaced)         0.537     8.367    u_reg_file/mem_reg_0_255_0_0_i_85_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.418     8.785 r  u_reg_file/mem_reg_0_255_0_0_i_38/CO[3]
+                         net (fo=1, unplaced)         0.000     8.785    u_reg_file/mem_reg_0_255_0_0_i_38_n_0
+                         CARRY4 (Prop_carry4_CI_O[1])
+                                                      0.277     9.062 f  u_reg_file/mem_reg_0_255_0_0_i_34/O[1]
+                         net (fo=2, unplaced)         0.483     9.545    u_dilate/gen_line_buf[0].u_line_buffer/mx_sat[11]
+                         LUT4 (Prop_lut4_I1_O)        0.268     9.813 r  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_8/O
+                         net (fo=1, unplaced)         0.000     9.813    u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_8_n_0
+                         CARRY4 (Prop_carry4_DI[2]_CO[3])
+                                                      0.352    10.165 f  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_2__0/CO[3]
+                         net (fo=2, unplaced)         0.781    10.946    u_median/hsr_reg[0][0][0]
+                         LUT4 (Prop_lut4_I0_O)        0.105    11.051 f  u_median/mem_reg_0_255_0_0_i_1__1/O
+                         net (fo=14, unplaced)        0.398    11.449    u_dilate/gen_line_buf[0].u_line_buffer/seg_mask
+                         LUT5 (Prop_lut5_I0_O)        0.105    11.554 f  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_3__0/O
+                         net (fo=1, unplaced)         0.347    11.901    u_dilate/gen_line_buf[6].u_line_buffer/hsr_reg[0][0]
+                         LUT6 (Prop_lut6_I5_O)        0.105    12.006 f  u_dilate/gen_line_buf[6].u_line_buffer/mem_reg_0_255_0_0_i_1__23/O
+                         net (fo=15, unplaced)        0.400    12.406    u_erode/gen_line_buf[2].u_line_buffer/dil_mask
+                         LUT2 (Prop_lut2_I1_O)        0.105    12.511 f  u_erode/gen_line_buf[2].u_line_buffer/mask_d1_i_1/O
+                         net (fo=6, unplaced)         0.379    12.890    u_reg_file/mask_d
+                         LUT6 (Prop_lut6_I0_O)        0.105    12.995 f  u_reg_file/in_run_i_2/O
+                         net (fo=4, unplaced)         0.371    13.366    u_reg_file/mask_t
+                         LUT5 (Prop_lut5_I0_O)        0.105    13.471 r  u_reg_file/emit_y[9]_i_1/O
+                         net (fo=31, unplaced)        0.436    13.907    u_blob_track/E[0]
+                         FDCE                                         r  u_blob_track/emit_x0_reg[3]/CE
   -------------------------------------------------------------------    -------------------
 
                          (clock ooc_clk rise edge)   20.000    20.000 r  
                                                       0.000    20.000 r  clk (IN)
-                         net (fo=5597, unset)         0.748    20.748    u_aim_predict/clk
-                         FDCE                                         r  u_aim_predict/pay_reg[1]/C
+                         net (fo=5892, unset)         0.748    20.748    u_blob_track/clk
+                         FDCE                                         r  u_blob_track/emit_x0_reg[3]/C
                          clock pessimism              0.000    20.748    
                          clock uncertainty           -0.035    20.712    
-                         FDCE (Setup_fdce_C_D)        0.029    20.741    u_aim_predict/pay_reg[1]
+                         FDCE (Setup_fdce_C_CE)      -0.165    20.547    u_blob_track/emit_x0_reg[3]
   -------------------------------------------------------------------
-                         required time                         20.741    
-                         arrival time                         -15.121    
+                         required time                         20.547    
+                         arrival time                         -13.907    
   -------------------------------------------------------------------
-                         slack                                  5.620    
+                         slack                                  6.640    
 
-Slack (MET) :             5.620ns  (required time - arrival time)
-  Source:                 u_blob_track/center_y_reg[1]/C
+Slack (MET) :             6.640ns  (required time - arrival time)
+  Source:                 u_median/dout_reg[5]/C
                             (rising edge-triggered cell FDCE clocked by ooc_clk  {rise@0.000ns fall@10.000ns period=20.000ns})
-  Destination:            u_aim_predict/pay_reg[2]/D
+  Destination:            u_blob_track/emit_x0_reg[4]/CE
                             (rising edge-triggered cell FDCE clocked by ooc_clk  {rise@0.000ns fall@10.000ns period=20.000ns})
   Path Group:             ooc_clk
   Path Type:              Setup (Max at Slow Process Corner)
   Requirement:            20.000ns  (ooc_clk rise@20.000ns - ooc_clk rise@0.000ns)
-  Data Path Delay:        14.334ns  (logic 9.233ns (64.413%)  route 5.101ns (35.587%))
-  Logic Levels:           22  (CARRY4=14 DSP48E1=1 LUT2=4 LUT3=1 LUT6=2)
+  Data Path Delay:        13.120ns  (logic 4.379ns (33.377%)  route 8.741ns (66.623%))
+  Logic Levels:           20  (CARRY4=6 LUT2=1 LUT3=2 LUT4=2 LUT5=3 LUT6=6)
   Clock Path Skew:        -0.039ns (DCD - SCD + CPR)
     Destination Clock Delay (DCD):    0.748ns = ( 20.748 - 20.000 ) 
     Source Clock Delay      (SCD):    0.787ns
@@ -630,85 +578,72 @@ Slack (MET) :             5.620ns  (required time - arrival time)
   -------------------------------------------------------------------    -------------------
                          (clock ooc_clk rise edge)    0.000     0.000 r  
                                                       0.000     0.000 r  clk (IN)
-                         net (fo=5597, unset)         0.787     0.787    u_blob_track/clk
-                         FDCE                                         r  u_blob_track/center_y_reg[1]/C
+                         net (fo=5892, unset)         0.787     0.787    u_median/clk
+                         FDCE                                         r  u_median/dout_reg[5]/C
   -------------------------------------------------------------------    -------------------
-                         FDCE (Prop_fdce_C_Q)         0.379     1.166 r  u_blob_track/center_y_reg[1]/Q
-                         net (fo=11, unplaced)        0.408     1.574    u_blob_track/center_y_reg[9]_0[1]
-                         LUT2 (Prop_lut2_I0_O)        0.232     1.806 r  u_blob_track/vy_s[7]_i_15/O
-                         net (fo=1, unplaced)         0.000     1.806    u_blob_track/vy_s[7]_i_15_n_0
-                         CARRY4 (Prop_carry4_S[1]_CO[3])
-                                                      0.457     2.263 r  u_blob_track/vy_s_reg[7]_i_8/CO[3]
-                         net (fo=1, unplaced)         0.008     2.271    u_blob_track/vy_s_reg[7]_i_8_n_0
-                         CARRY4 (Prop_carry4_CI_O[0])
-                                                      0.191     2.462 r  u_blob_track/vy_s_reg[15]_i_14/O[0]
-                         net (fo=2, unplaced)         0.552     3.014    u_aim_predict/dy40[4]
-                         CARRY4 (Prop_carry4_DI[3]_CO[3])
-                                                      0.451     3.465 r  u_aim_predict/vy_s_reg[7]_i_7/CO[3]
-                         net (fo=1, unplaced)         0.000     3.465    u_aim_predict/vy_s_reg[7]_i_7_n_0
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275     3.740 r  u_aim_predict/vy_s_reg[15]_i_9/O[3]
-                         net (fo=1, unplaced)         0.519     4.259    u_aim_predict/vy_s_reg[15]_i_9_n_4
-                         LUT2 (Prop_lut2_I1_O)        0.250     4.509 r  u_aim_predict/vy_s[11]_i_4/O
-                         net (fo=1, unplaced)         0.000     4.509    u_aim_predict/vy_s[11]_i_4_n_0
-                         CARRY4 (Prop_carry4_S[2]_CO[3])
-                                                      0.332     4.841 r  u_aim_predict/vy_s_reg[11]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.000     4.841    u_aim_predict/vy_s_reg[11]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275     5.116 r  u_aim_predict/vy_s_reg[15]_i_2/O[3]
-                         net (fo=17, unplaced)        0.575     5.691    u_aim_predict/nvy[15]
-                         LUT3 (Prop_lut3_I2_O)        0.250     5.941 r  u_aim_predict/vy_s[15]_i_1/O
-                         net (fo=16, unplaced)        0.646     6.587    u_aim_predict/vyn[15]
-                         DSP48E1 (Prop_dsp48e1_A[29]_P[9])
-                                                      3.230     9.817 r  u_aim_predict/muly/P[9]
-                         net (fo=1, unplaced)         0.646    10.462    u_blob_track/pcy_reg[9][1]
-                         LUT2 (Prop_lut2_I1_O)        0.105    10.567 r  u_blob_track/pcy[3]_i_5/O
-                         net (fo=1, unplaced)         0.000    10.567    u_blob_track/pcy[3]_i_5_n_0
-                         CARRY4 (Prop_carry4_S[1]_CO[3])
-                                                      0.457    11.024 r  u_blob_track/pcy_reg[3]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.008    11.032    u_blob_track/pcy_reg[3]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    11.130 r  u_blob_track/pcy_reg[7]_i_2/CO[3]
-                         net (fo=1, unplaced)         0.000    11.130    u_blob_track/pcy_reg[7]_i_2_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    11.228 r  u_blob_track/pcy_reg[9]_i_3/CO[3]
-                         net (fo=1, unplaced)         0.000    11.228    u_aim_predict/pcy_reg[0]_0[0]
-                         CARRY4 (Prop_carry4_CI_O[3])
-                                                      0.275    11.503 f  u_aim_predict/pcy_reg[9]_i_4/O[3]
-                         net (fo=41, unplaced)        0.596    12.099    u_aim_predict_n_72
-                         LUT2 (Prop_lut2_I1_O)        0.253    12.352 r  pcy[9]_i_6/O
-                         net (fo=1, unplaced)         0.000    12.352    pcy[9]_i_6_n_0
-                         CARRY4 (Prop_carry4_DI[1]_CO[1])
-                                                      0.406    12.758 r  pcy_reg[9]_i_2/CO[1]
-                         net (fo=39, unplaced)        0.316    13.074    u_aim_predict/CO[0]
-                         LUT6 (Prop_lut6_I4_O)        0.277    13.351 r  u_aim_predict/pay[9]_i_31/O
-                         net (fo=1, unplaced)         0.537    13.888    u_aim_predict/pay[9]_i_31_n_0
+                         FDCE (Prop_fdce_C_Q)         0.379     1.166 r  u_median/dout_reg[5]/Q
+                         net (fo=11, unplaced)        0.645     1.811    u_median/dout_reg[5]_0[0]
+                         LUT3 (Prop_lut3_I0_O)        0.251     2.062 r  u_median/hgr_reg_0_127_0_0_i_42/O
+                         net (fo=14, unplaced)        0.633     2.695    u_median/pix_seg[5]
+                         LUT6 (Prop_lut6_I0_O)        0.105     2.800 r  u_median/mem_reg_0_255_0_0_i_255/O
+                         net (fo=1, unplaced)         0.537     3.337    u_median/mem_reg_0_255_0_0_i_255_n_0
                          CARRY4 (Prop_carry4_DI[1]_CO[3])
-                                                      0.418    14.306 r  u_aim_predict/pay_reg[9]_i_17/CO[3]
-                         net (fo=1, unplaced)         0.008    14.314    u_aim_predict/pay_reg[9]_i_17_n_0
-                         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.098    14.412 r  u_aim_predict/pay_reg[9]_i_6/CO[3]
-                         net (fo=1, unplaced)         0.000    14.412    u_aim_predict/pay_reg[9]_i_6_n_0
-                         CARRY4 (Prop_carry4_CI_CO[1])
-                                                      0.149    14.561 r  u_aim_predict/pay_reg[9]_i_2/CO[1]
-                         net (fo=10, unplaced)        0.283    14.844    u_aim_predict/pay_p1
-                         LUT6 (Prop_lut6_I0_O)        0.277    15.121 r  u_aim_predict/pay[2]_i_1/O
-                         net (fo=1, unplaced)         0.000    15.121    u_aim_predict/pay[2]_i_1_n_0
-                         FDCE                                         r  u_aim_predict/pay_reg[2]/D
+                                                      0.418     3.755 r  u_median/mem_reg_0_255_0_0_i_195/CO[3]
+                         net (fo=8, unplaced)         0.808     4.563    u_median/u_color_seg/mx2
+                         LUT6 (Prop_lut6_I4_O)        0.105     4.668 f  u_median/mem_reg_0_255_0_0_i_122/O
+                         net (fo=14, unplaced)        0.398     5.066    u_median/dout_reg[11]_0
+                         LUT3 (Prop_lut3_I0_O)        0.105     5.171 r  u_median/mem_reg_0_255_0_0_i_208/O
+                         net (fo=3, unplaced)         0.365     5.536    u_median/mem_reg_0_255_0_0_i_208_n_0
+                         LUT6 (Prop_lut6_I5_O)        0.105     5.641 r  u_median/mem_reg_0_255_0_0_i_137/O
+                         net (fo=1, unplaced)         0.367     6.008    u_median/mem_reg_0_255_0_0_i_137_n_0
+                         CARRY4 (Prop_carry4_DI[3]_CO[3])
+                                                      0.318     6.326 r  u_median/mem_reg_0_255_0_0_i_62/CO[3]
+                         net (fo=1, unplaced)         0.008     6.334    u_median/mem_reg_0_255_0_0_i_62_n_0
+                         CARRY4 (Prop_carry4_CI_O[1])
+                                                      0.277     6.611 r  u_median/mem_reg_0_255_0_0_i_165/O[1]
+                         net (fo=2, unplaced)         0.483     7.094    u_reg_file/mem_reg_0_255_0_0_i_87_1[1]
+                         LUT5 (Prop_lut5_I3_O)        0.266     7.360 r  u_reg_file/mem_reg_0_255_0_0_i_164/O
+                         net (fo=3, unplaced)         0.365     7.725    u_reg_file/reg_written_reg_rep_0
+                         LUT6 (Prop_lut6_I0_O)        0.105     7.830 r  u_reg_file/mem_reg_0_255_0_0_i_85/O
+                         net (fo=1, unplaced)         0.537     8.367    u_reg_file/mem_reg_0_255_0_0_i_85_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.418     8.785 r  u_reg_file/mem_reg_0_255_0_0_i_38/CO[3]
+                         net (fo=1, unplaced)         0.000     8.785    u_reg_file/mem_reg_0_255_0_0_i_38_n_0
+                         CARRY4 (Prop_carry4_CI_O[1])
+                                                      0.277     9.062 f  u_reg_file/mem_reg_0_255_0_0_i_34/O[1]
+                         net (fo=2, unplaced)         0.483     9.545    u_dilate/gen_line_buf[0].u_line_buffer/mx_sat[11]
+                         LUT4 (Prop_lut4_I1_O)        0.268     9.813 r  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_8/O
+                         net (fo=1, unplaced)         0.000     9.813    u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_8_n_0
+                         CARRY4 (Prop_carry4_DI[2]_CO[3])
+                                                      0.352    10.165 f  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_2__0/CO[3]
+                         net (fo=2, unplaced)         0.781    10.946    u_median/hsr_reg[0][0][0]
+                         LUT4 (Prop_lut4_I0_O)        0.105    11.051 f  u_median/mem_reg_0_255_0_0_i_1__1/O
+                         net (fo=14, unplaced)        0.398    11.449    u_dilate/gen_line_buf[0].u_line_buffer/seg_mask
+                         LUT5 (Prop_lut5_I0_O)        0.105    11.554 f  u_dilate/gen_line_buf[0].u_line_buffer/mem_reg_0_255_0_0_i_3__0/O
+                         net (fo=1, unplaced)         0.347    11.901    u_dilate/gen_line_buf[6].u_line_buffer/hsr_reg[0][0]
+                         LUT6 (Prop_lut6_I5_O)        0.105    12.006 f  u_dilate/gen_line_buf[6].u_line_buffer/mem_reg_0_255_0_0_i_1__23/O
+                         net (fo=15, unplaced)        0.400    12.406    u_erode/gen_line_buf[2].u_line_buffer/dil_mask
+                         LUT2 (Prop_lut2_I1_O)        0.105    12.511 f  u_erode/gen_line_buf[2].u_line_buffer/mask_d1_i_1/O
+                         net (fo=6, unplaced)         0.379    12.890    u_reg_file/mask_d
+                         LUT6 (Prop_lut6_I0_O)        0.105    12.995 f  u_reg_file/in_run_i_2/O
+                         net (fo=4, unplaced)         0.371    13.366    u_reg_file/mask_t
+                         LUT5 (Prop_lut5_I0_O)        0.105    13.471 r  u_reg_file/emit_y[9]_i_1/O
+                         net (fo=31, unplaced)        0.436    13.907    u_blob_track/E[0]
+                         FDCE                                         r  u_blob_track/emit_x0_reg[4]/CE
   -------------------------------------------------------------------    -------------------
 
                          (clock ooc_clk rise edge)   20.000    20.000 r  
                                                       0.000    20.000 r  clk (IN)
-                         net (fo=5597, unset)         0.748    20.748    u_aim_predict/clk
-                         FDCE                                         r  u_aim_predict/pay_reg[2]/C
+                         net (fo=5892, unset)         0.748    20.748    u_blob_track/clk
+                         FDCE                                         r  u_blob_track/emit_x0_reg[4]/C
                          clock pessimism              0.000    20.748    
                          clock uncertainty           -0.035    20.712    
-                         FDCE (Setup_fdce_C_D)        0.029    20.741    u_aim_predict/pay_reg[2]
+                         FDCE (Setup_fdce_C_CE)      -0.165    20.547    u_blob_track/emit_x0_reg[4]
   -------------------------------------------------------------------
-                         required time                         20.741    
-                         arrival time                         -15.121    
+                         required time                         20.547    
+                         arrival time                         -13.907    
   -------------------------------------------------------------------
-                         slack                                  5.620    
+                         slack                                  6.640    
 
 
 
@@ -721,22 +656,22 @@ Waveform(ns):       { 0.000 10.000 }
 Period(ns):         20.000
 Sources:            { clk }
 
-Check Type        Corner  Lib Pin      Reference Pin  Required(ns)  Actual(ns)  Slack(ns)  Location  Pin
-Min Period        n/a     FDCE/C       n/a            1.000         20.000      19.000               aim_x_r_reg[1]/C
-Min Period        n/a     FDCE/C       n/a            1.000         20.000      19.000               aim_x_r_reg[2]/C
-Min Period        n/a     FDCE/C       n/a            1.000         20.000      19.000               aim_x_r_reg[3]/C
-Min Period        n/a     FDCE/C       n/a            1.000         20.000      19.000               aim_x_r_reg[4]/C
-Min Period        n/a     FDCE/C       n/a            1.000         20.000      19.000               aim_x_r_reg[5]/C
-Low Pulse Width   Fast    RAMS64E/CLK  n/a            1.130         10.000      8.870                u_median/u_lb0/mem_reg_512_767_3_3/RAMS64E_C/CLK
-Low Pulse Width   Fast    RAMS64E/CLK  n/a            1.130         10.000      8.870                u_median/u_lb0/mem_reg_512_767_3_3/RAMS64E_D/CLK
-Low Pulse Width   Fast    RAMS64E/CLK  n/a            1.130         10.000      8.870                u_median/u_lb0/mem_reg_512_767_4_4/RAMS64E_A/CLK
-Low Pulse Width   Fast    RAMS64E/CLK  n/a            1.130         10.000      8.870                u_median/u_lb0/mem_reg_512_767_4_4/RAMS64E_B/CLK
-Low Pulse Width   Fast    RAMS64E/CLK  n/a            1.130         10.000      8.870                u_median/u_lb0/mem_reg_512_767_4_4/RAMS64E_C/CLK
-High Pulse Width  Slow    RAMS64E/CLK  n/a            1.130         10.000      8.870                u_median/u_lb0/mem_reg_512_767_3_3/RAMS64E_C/CLK
-High Pulse Width  Fast    RAMS64E/CLK  n/a            1.130         10.000      8.870                u_median/u_lb0/mem_reg_512_767_3_3/RAMS64E_C/CLK
-High Pulse Width  Slow    RAMS64E/CLK  n/a            1.130         10.000      8.870                u_median/u_lb0/mem_reg_512_767_3_3/RAMS64E_D/CLK
-High Pulse Width  Fast    RAMS64E/CLK  n/a            1.130         10.000      8.870                u_median/u_lb0/mem_reg_512_767_3_3/RAMS64E_D/CLK
-High Pulse Width  Slow    RAMS64E/CLK  n/a            1.130         10.000      8.870                u_median/u_lb0/mem_reg_512_767_4_4/RAMS64E_A/CLK
+Check Type        Corner  Lib Pin             Reference Pin  Required(ns)  Actual(ns)  Slack(ns)  Location  Pin
+Min Period        n/a     RAMB36E1/CLKARDCLK  n/a            2.761         20.000      17.239               u_temporal_acc/acc_mem_reg_7_0/CLKARDCLK
+Min Period        n/a     RAMB36E1/CLKARDCLK  n/a            2.761         20.000      17.239               u_temporal_acc/acc_mem_reg_7_1/CLKARDCLK
+Min Period        n/a     RAMB36E1/CLKARDCLK  n/a            2.761         20.000      17.239               u_temporal_acc/acc_mem_reg_8_0/CLKARDCLK
+Min Period        n/a     RAMB36E1/CLKARDCLK  n/a            2.761         20.000      17.239               u_temporal_acc/acc_mem_reg_8_1/CLKARDCLK
+Min Period        n/a     RAMB36E1/CLKARDCLK  n/a            2.761         20.000      17.239               u_temporal_acc/acc_mem_reg_9_0/CLKARDCLK
+Low Pulse Width   Fast    RAMS64E/CLK         n/a            1.130         10.000      8.870                u_video_delay/gen_line_buf[6].u_line_buffer/mem_reg_0_255_6_6/RAMS64E_D/CLK
+Low Pulse Width   Fast    RAMS64E/CLK         n/a            1.130         10.000      8.870                u_video_delay/gen_line_buf[6].u_line_buffer/mem_reg_0_255_7_7/RAMS64E_A/CLK
+Low Pulse Width   Fast    RAMS64E/CLK         n/a            1.130         10.000      8.870                u_video_delay/gen_line_buf[6].u_line_buffer/mem_reg_0_255_7_7/RAMS64E_B/CLK
+Low Pulse Width   Fast    RAMS64E/CLK         n/a            1.130         10.000      8.870                u_video_delay/gen_line_buf[6].u_line_buffer/mem_reg_0_255_7_7/RAMS64E_C/CLK
+Low Pulse Width   Fast    RAMS64E/CLK         n/a            1.130         10.000      8.870                u_video_delay/gen_line_buf[6].u_line_buffer/mem_reg_0_255_7_7/RAMS64E_D/CLK
+High Pulse Width  Slow    RAMS64E/CLK         n/a            1.130         10.000      8.870                u_video_delay/gen_line_buf[6].u_line_buffer/mem_reg_0_255_6_6/RAMS64E_D/CLK
+High Pulse Width  Fast    RAMS64E/CLK         n/a            1.130         10.000      8.870                u_video_delay/gen_line_buf[6].u_line_buffer/mem_reg_0_255_6_6/RAMS64E_D/CLK
+High Pulse Width  Slow    RAMS64E/CLK         n/a            1.130         10.000      8.870                u_video_delay/gen_line_buf[6].u_line_buffer/mem_reg_0_255_7_7/RAMS64E_A/CLK
+High Pulse Width  Fast    RAMS64E/CLK         n/a            1.130         10.000      8.870                u_video_delay/gen_line_buf[6].u_line_buffer/mem_reg_0_255_7_7/RAMS64E_A/CLK
+High Pulse Width  Slow    RAMS64E/CLK         n/a            1.130         10.000      8.870                u_video_delay/gen_line_buf[6].u_line_buffer/mem_reg_0_255_7_7/RAMS64E_B/CLK
 
 
 
