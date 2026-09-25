@@ -163,7 +163,7 @@ armor_vision #(
     .REL_SAT_PCT (8'd20      ),
     .TH_MIN      (4          ),
     .MIN_SIZE    (24         ),
-    .AIM_H_Q8    (8'd64      ),
+    .AIM_H_Q8    (16'd64      ),
     .RING_T      (2          ),
     .CROSS_L     (12         )
 ) u_armor_vision (
@@ -218,6 +218,46 @@ vision_stat #(
     .miss_frames (t_miss_frames          ),
     .frame_tick  (t_frame_tick           )
 );
+//-------------------------------------------------------
+// 真实靶标参数（AIM_H_Q8 = 372）的验证实例
+//   本靶标：打击点在灯心上方 80mm、灯直径 55mm -> 1.449 倍灯直径
+//   仿真图：灯心 y=248、灯宽约 201px -> 偏移 = 201*372/256 = 292px
+//   292 > 248，瞄准点必然跑到画面上方之外 -> 必须【饱和到 0】。
+//   如果这里读到 1023 附近，就是无符号下溢回绕（十字会跳到画面底部）。
+//-------------------------------------------------------
+wire        real_valid;
+wire [9:0]  real_cx, real_cy, real_ax, real_ay;
+
+blob_track #(
+    .WIDTH    (800     ),
+    .HEIGHT   (480     ),
+    .AW       (10      ),
+    .MIN_AREA (400     )
+) u_blob_real (
+    .clk        (clk                    ),
+    .rst_n      (rst_n                  ),
+    .vsync      (vsync                  ),
+    .de         (u_armor_vision.de_v    ),
+    .x          (u_armor_vision.x_v     ),
+    .y          (u_armor_vision.y_cnt   ),
+    .mask       (u_armor_vision.mask_d  ),
+    .aim_h_q8   (16'd372                ),
+    .bond_valid (real_valid             ),
+    .bond_l     (                       ),
+    .bond_r     (                       ),
+    .bond_t     (                       ),
+    .bond_b     (                       ),
+    .center_x   (real_cx                ),
+    .center_y   (real_cy                ),
+    .aim_x      (real_ax                ),
+    .aim_y      (real_ay                ),
+    .blob_area  (                       ),
+    .blob_cnt   (                       ),
+    .cent_x     (                       ),
+    .cent_y     (                       ),
+    .fill_q8    (                       )
+);
+
 
 //-------------------------------------------------------
 // 抓取样点（用模块内部的像素坐标对齐，最稳）
@@ -397,6 +437,11 @@ initial begin
     chk("center_y",   center_y             , EXP_CY  );
     chk("aim_x",      aim_x                , EXP_CX  );
     chk_near("aim_y",   aim_y              , EXP_AY  , 32'd2);
+    //  真实靶标参数 372：圆心不变，但偏移 292px > 灯心 y -> 必须饱和到 0
+    chk("real_bond_v",  real_valid         , 32'd1   );
+    chk("real_center_y", real_cy           , EXP_CY  );
+    chk("real_aim_x",    real_ax           , EXP_CX  );
+    chk("real_aim_y_sat", real_ay          , 32'd0   );
     chk_near("cent_x",  u_armor_vision.cent_x, EXP_CX, 32'd3);
     chk_near("cent_y",  u_armor_vision.cent_y, EXP_CY, 32'd3);
     //  填充率：半径 100 的圆 -> area/(w*h) 约 31417/39601 = 0.793 -> fill_q8 约 203

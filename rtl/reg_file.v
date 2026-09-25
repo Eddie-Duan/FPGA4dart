@@ -33,6 +33,7 @@ module reg_file (
     output reg [7:0]   r_ctrl    ,   // b0=����Ӧ b1=��ֵ b2=�ع�ջ� b3=��ֵ��ʾ b4=OSD
     output reg [7:0]   r_gate    ,
     output reg [7:0]   r_pct     ,
+    output reg [7:0]   r_lead_q4 ,   // 速度预测提前量（帧 x16，Q4）
     output reg         wr_pulse      // �в�����д������һ�����壨�ɽ� LED ��ʾ��
 );
 
@@ -58,12 +59,13 @@ always @(posedge clk or negedge rst_n) begin
         r_th_gr    <= 8'd32;
         r_th_gb    <= 8'd32;
         r_rel_sat  <= 8'd20;
-        r_min_size <= 8'd24;
-        r_aim_h    <= 8'd64;
+        r_min_size <= 8'd8;
+        r_aim_h    <= 8'd116;   // = 372 & 0xFF，与 armor_vision 的 AIM_H_Q8 默认一致
         r_ring_t   <= 8'd2;
         r_ctrl     <= 8'h00;      // Ĭ��ȫ���¹��ܹرգ���Ϊ��Ķ�ǰһ�£�
         r_gate     <= 8'd96;
         r_pct      <= 8'd15;
+        r_lead_q4  <= 8'd64;   // 4.0 帧（30fps 下约 133ms 提前量）
     end
     else begin
         wr_pulse <= 1'b0;
@@ -96,6 +98,7 @@ always @(posedge clk or negedge rst_n) begin
                                 8'h07: r_ctrl     <= data_t;
                                 8'h08: r_gate     <= data_t;
                                 8'h09: r_pct      <= data_t;
+                                8'h0A: r_lead_q4  <= data_t;
                                 default: ;              // δ֪��ַ����
                             endcase
                         end

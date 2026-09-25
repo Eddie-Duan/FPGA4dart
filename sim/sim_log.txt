@@ -74,5 +74,118 @@ Compiling module work.uart_tx_default
 Compiling module work.result_frame
 Compiling module work.vision_stat
 Compiling module work.seg_display_default
-Compiling module work.armor_vision_default
+Compiling module work.armor_vision(AIM_H_Q8=16'b010000...
 Compiling module work.tb_armor_vision
+Built simulation snapshot tb_vision
+
+****** Webtalk v2020.2 (64-bit)
+  **** SW Build 3064766 on Wed Nov 18 09:12:45 MST 2020
+  **** IP Build 3064653 on Wed Nov 18 14:17:31 MST 2020
+    ** Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
+
+source C:/Users/DUANboyang/Desktop/FPGA4dart/sim/xsim.dir/tb_vision/webtalk/xsim_webtalk.tcl -notrace
+INFO: [Common 17-206] Exiting Webtalk at Thu Sep 24 10:25:28 2026...
+---- simulate ----
+
+****** xsim v2020.2 (64-bit)
+  **** SW Build 3064766 on Wed Nov 18 09:12:45 MST 2020
+  **** IP Build 3064653 on Wed Nov 18 14:17:31 MST 2020
+    ** Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
+
+source xsim.dir/tb_vision/xsim_script.tcl
+# xsim {tb_vision} -autoloadwcfg -runall
+Vivado Simulator 2020.2
+Time resolution is 1 ps
+run -all
+=======================================================
+ tb_armor_vision : DART green circle vision pipeline
+ image: 800x480, green disk center (400,240) radius 100
+=======================================================
+---- phase 1 : clean image, default thresholds ----
+  [OK]   bond_valid = 1 (0x00000001)
+  [OK]   bond_l = 308 (expect 309 +-2)
+  [OK]   bond_r = 508 (expect 507 +-2)
+  [OK]   bond_t = 148 (expect 149 +-2)
+  [OK]   bond_b = 348 (expect 347 +-2)
+  [OK]   bond_w = 201 (expect 199 +-3)
+  [OK]   center_x = 408 (0x00000198)
+  [OK]   center_y = 248 (0x000000f8)
+  [OK]   aim_x = 408 (0x00000198)
+  [OK]   aim_y = 198 (expect 199 +-2)
+  [OK]   real_bond_v = 1 (0x00000001)
+  [OK]   real_center_y = 248 (0x000000f8)
+  [OK]   real_aim_x = 408 (0x00000198)
+  [OK]   real_aim_y_sat = 0 (0x00000000)
+  [OK]   cent_x = 408 (expect 408 +-3)
+  [OK]   cent_y = 248 (expect 248 +-3)
+  [OK]   fill_q8 = 199 in [185, 215]
+  [OK]   blob_cnt = 1 (0x00000001)
+  [OK]   blob_area>0 = 1 (0x00000001)
+  [OK]   th_g = 100 (0x00000064)
+  [OK]   th_gr = 32 (0x00000020)
+  [OK]   th_gb = 32 (0x00000020)
+  [OK]   sel = 0 (0x00000000)
+---- phase 1 : pixel checks ----
+  [OK]   inside_green = 29966 (0x0000750e)
+  [OK]   bg_dim = 16904 (0x00004208)
+  [OK]   ring_red = 63488 (0x0000f800)
+  [OK]   cctr_green = 29966 (0x0000750e)
+  [OK]   aim_red = 63488 (0x0000f800)
+---- phase 1 : misc ----
+  [OK]   led3_detected = 0 (0x00000000)
+  [OK]   seg_sel_act = 1 (0x00000001)
+---- phase 2 : GLARE band across the lamp (py 225..255) ----
+     old run-based projection collapsed here (h~84, cy~190)
+  [OK]   bond_valid = 1 (0x00000001)
+  [OK]   bond_l = 310 (expect 310 +-3)
+  [OK]   bond_r = 506 (expect 506 +-3)
+  [OK]   bond_w = 197 (expect 197 +-4)
+  [OK]   bond_t = 148 (expect 149 +-2)
+  [OK]   bond_b = 348 (expect 347 +-2)
+  [OK]   center_y = 248 (0x000000f8)
+  [OK]   aim_y = 199 (expect 199 +-2)
+---- phase 2 : glare removed, must recover ----
+  [OK]   bond_l = 308 (expect 309 +-2)
+  [OK]   inside_green = 29966 (0x0000750e)
+  [OK]   ring_red = 63488 (0x0000f800)
+---- phase 3 : key[0] x1 -> select TH_G-R ----
+  [OK]   sel = 1 (0x00000001)
+  [OK]   bond_valid = 1 (0x00000001)
+---- phase 4 : key[1] x2 -> TH_GR=48 > G-R(44) -> lost ----
+  [OK]   th_gr = 48 (0x00000030)
+  [OK]   bond_valid = 0 (0x00000000)
+  [OK]   led3_blink = 0 (0x00000000)
+---- phase 5 : key[2] x2 -> TH_GR back to 32 -> found ----
+  [OK]   th_gr = 32 (0x00000020)
+  [OK]   bond_valid = 1 (0x00000001)
+  [OK]   center_x = 408 (0x00000198)
+  [OK]   aim_y = 198 (expect 199 +-2)
+---- phase 6 : key[0] x1 -> select TH_G-B ----
+  [OK]   sel = 2 (0x00000002)
+---- phase 7 : key[3] x1 -> binary display mode ----
+  [OK]   disp_bin = 1 (0x00000001)
+  [OK]   bin_white = 65535 (0x0000ffff)
+---- phase 8 : vision_stat instrumentation (P0) ----
+     frame period = H_TOTAL*V_TOTAL = 1056*525 = 554400 clk
+  [OK]   frame_lines = 480 (0x000001e0)
+  [OK]   frame_cyc = 554400 (0x000875a0)
+  [OK]   mask_cnt = 31417 in [30000, 33000]
+  [OK]   hit_frames!=0 = 1 (0x00000001)
+  [OK]   miss_frames!=0 = 1 (0x00000001)
+  [OK]   t_fps = 2 (0x00000002)
+  [OK]   t_frame_lines = 480 (0x000001e0)
+---- phase 9 : track_ab unit test (P4) ----
+  [OK]   ta_hit1_valid0 = 0 (0x00000000)
+  [OK]   ta_hit2_valid1 = 1 (0x00000001)
+  [OK]   ta_cx = 400 (expect 400 +-6)
+  [OK]   ta_hold_valid = 1 (0x00000001)
+  [OK]   ta_gate_reject = 1 (0x00000001)
+  [OK]   ta_gate_lost = 4 (0x00000004)
+  [OK]   ta_not_jump = 400 (expect 400 +-40)
+  [OK]   ta_drop_valid = 0 (0x00000000)
+==== ALL CHECKS PASSED ====
+$finish called at time : 931446260 ns : File "C:/Users/DUANboyang/Desktop/FPGA4dart/sim/tb_armor_vision.v" Line 589
+run: Time (s): cpu = 00:00:02 ; elapsed = 00:04:09 . Memory (MB): peak = 925.230 ; gain = 0.027
+exit
+INFO: [Common 17-206] Exiting xsim at Thu Sep 24 10:29:42 2026...
+请按任意键继续. . . 

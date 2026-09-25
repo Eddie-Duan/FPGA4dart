@@ -59,7 +59,11 @@ module armor_vision #(
     parameter [7:0] REL_SAT_PCT = 8'd20,   // 相对饱和度闸门限（%）；0 = 关闭该闸
     parameter TH_MIN      = 4          ,   // 投影峰值阈值（一行/一列的亮像素数）
     parameter MIN_SIZE    = 24         ,   // 目标最小边长
-    parameter [7:0] AIM_H_Q8 = 8'd64   ,   // 瞄准点在灯的上方 = 宽度 x AIM_H_Q8/256
+    //  瞄准点偏移 = 宽度 x AIM_H_Q8/256，Q0.8 定点。
+    //  真实靶标：打击点在灯心上方 80mm、灯直径 55mm
+    //  -> 256*80/55 = 372（= 1.449 倍灯直径，不是 1/4）。
+    //  注意：必须 >= 9bit。写成 8bit 装不下 372，会被静默截断成 116（= 0.45 倍）。
+    parameter [15:0] AIM_H_Q8 = 16'd372 ,
     parameter RING_T      = 2          ,   // 圆环宽度（像素）
     parameter CROSS_L     = 12         ,   // 十字臂长度（像素）
 
@@ -402,12 +406,16 @@ video_delay #(
 //-------------------------------------------------------
 // (8) 团块跟踪（P3）：行程级连通团块
 //-------------------------------------------------------
+//  UART 写 0x05 后，偏移取 {参数高 8 位, 寄存器低 8 位}。
+//  372 = 16'h0174 -> 高 8 位 1、低 8 位 0x74(116)，reg_file 的复位值也是 116，
+//  所以只写别的阈值寄存器不会把瞄准高度改掉。
+wire [15:0] aim_h_eff = reg_written ? {AIM_H_Q8[15:8], rf_aim_h} : AIM_H_Q8;
+
 blob_track #(
     .WIDTH    (IMG_W    ),
     .HEIGHT   (IMG_H    ),
     .AW       (AW       ),
-    .MIN_AREA (MIN_AREA ),
-    .AIM_H_Q8 (AIM_H_Q8 )
+    .MIN_AREA (MIN_AREA )
 ) u_blob_track (
     .clk        (clk        ),
     .rst_n      (rst_n      ),
@@ -416,6 +424,7 @@ blob_track #(
     .x          (x_v        ),
     .y          (y_cnt      ),
     .mask       (mask_d     ),
+    .aim_h_q8   (aim_h_eff   ),   // 运行时可变：UART 0x05 只覆盖低 8 位（小数）
     .bond_valid (raw_valid  ),
     .bond_l     (raw_l      ),
     .bond_r     (raw_r      ),

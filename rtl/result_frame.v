@@ -24,6 +24,16 @@
 //   发送节流：每 TX_DIV 帧发一次（默认 8 -> 30fps 下约 3.75Hz），避免占满串口。
 //   资源：约 120 LUT / 180 FF。
 //****************************************************************************************//
+//   v2（当前，24 字节）：前 15 个字节的含义与 v1 完全一致，后面接预测字段
+//     15 vx_hi  16 vx_lo          速度估计 x（Q4，有符号，1 px/帧 = 16）
+//     17 vy_hi  18 vy_lo          速度估计 y（Q4，有符号）
+//     19 px_hi  20 px_lo          预测灯心 x（LEAD 帧之后）
+//     21 py_hi  22 py_lo          预测灯心 y
+//     23 checksum                 byte2..byte22 逐字节异或
+//   flags.b7 = 1 表示 v2 帧：旧解析器算校验时用的是 byte2..byte14，
+//   与新帧必然对不上 -> 会【安全地丢弃】而不是读出乱码。
+//   预测瞄准点 = (px, py - w*AIM_H_Q8/256)，接收端按自己的 AIM_H_Q8 算即可。
+//
 module result_frame #(
     parameter CLK_FREQ = 25_000_000,
     parameter BAUD     = 115200,
@@ -43,6 +53,13 @@ module result_frame #(
     input      [2:0]   blob_cnt  ,
     input              adapt_ok  ,
     input              disp_bin  ,
+    input               pred_ok   ,   // 预测有效（连续 >= 2 帧）
+    input               moving    ,   // 目标在动
+    input               far_small ,   // 命中的是宽松档（小而远的目标）
+    input signed [15:0] vx_q4     ,
+    input signed [15:0] vy_q4     ,
+    input      [9:0]    px        ,   // 预测灯心
+    input      [9:0]    py        ,
     output             txd
 );
 
@@ -52,7 +69,8 @@ localparam S_IDLE = 2'd0, S_REQ = 2'd1, S_WAIT = 2'd2;
 //reg define
 reg  [7:0]  b0, b1, b2, b3, b4, b5, b6, b7;
 reg  [7:0]  b8, b9, b10, b11, b12, b13, b14, b15;
-reg  [3:0]  idx     ;
+reg  [7:0]  b16, b17, b18, b19, b20, b21, b22, b23;
+reg  [4:0]  idx     ;
 reg  [1:0]  state   ;
 reg  [7:0]  divcnt  ;
 reg  [7:0]  tx_byte ;
@@ -90,11 +108,14 @@ always @(posedge clk or negedge rst_n) begin
         b0<=8'hA5; b1<=8'h5A; b2<=8'h00; b3<=8'h00; b4<=8'h00; b5<=8'h00;
         b6<=8'h00; b7<=8'h00; b8<=8'h00; b9<=8'h00; b10<=8'h00; b11<=8'h00;
         b12<=8'h00; b13<=8'h00; b14<=8'h00; b15<=8'h00;
+        b16<=8'h00; b17<=8'h00; b18<=8'h00; b19<=8'h00;
+        b20<=8'h00; b21<=8'h00; b22<=8'h00; b23<=8'h00;
     end
     else if(tx_now) begin
         b0 <= 8'hA5;
         b1 <= 8'h5A;
-        b2 <= {5'b0, disp_bin, adapt_ok, valid};
+        b2 <= {1'b1, far_small, moving, pred_ok, 1'b0,
+               disp_bin, adapt_ok, valid};   // b7=1 -> v2 帧
         b3 <= {6'b0, cx[9:8]};          // cx 10bit，高字节只低 2 位有效
         b4 <= cx[7:0];
         b5 <= {6'b0, cy[9:8]};
@@ -107,27 +128,42 @@ always @(posedge clk or negedge rst_n) begin
         b12<= (area[31:7] > 32'd255) ? 8'd255 : area[14:7];
         b13<= (fill_q8 == 8'd255) ? 8'd255 : fill_q8;
         b14<= {5'b0, blob_cnt};
-        b15<= {5'b0, disp_bin, adapt_ok, valid}
-              ^ {6'b0, cx[9:8]} ^ cx[7:0] ^ {6'b0, cy[9:8]} ^ cy[7:0]
-              ^ {6'b0, ax[9:8]} ^ ax[7:0] ^ {6'b0, ay[9:8]} ^ ay[7:0]
+        b15<= vx_q4[15:8];
+        b16<= vx_q4[7:0];
+        b17<= vy_q4[15:8];
+        b18<= vy_q4[7:0];
+        b19<= {6'b0, px[9:8]};
+        b20<= px[7:0];
+        b21<= {6'b0, py[9:8]};
+        b22<= py[7:0];
+        b23<= {1'b1, far_small, moving, pred_ok, 1'b0,
+               disp_bin, adapt_ok, valid}
+              ^ cx[9:8] ^ cx[7:0] ^ cy[9:8] ^ cy[7:0]
+              ^ ax[9:8] ^ ax[7:0] ^ ay[9:8] ^ ay[7:0]
               ^ ((bw > 11'd255) ? 8'd255 : bw[7:0])
               ^ ((area[31:7] > 32'd255) ? 8'd255 : area[14:7])
               ^ fill_q8
-              ^ {5'b0, blob_cnt};
+              ^ {5'b0, blob_cnt}
+              ^ vx_q4[15:8] ^ vx_q4[7:0] ^ vy_q4[15:8] ^ vy_q4[7:0]
+              ^ {6'b0, px[9:8]} ^ px[7:0] ^ {6'b0, py[9:8]} ^ py[7:0];
     end
 end
 
 //-------------------------------------------------------
 // 发送状态机
 //-------------------------------------------------------
-wire [7:0] mux_byte = (idx == 4'd0 ) ? b0  : (idx == 4'd1 ) ? b1  :
-                      (idx == 4'd2 ) ? b2  : (idx == 4'd3 ) ? b3  :
-                      (idx == 4'd4 ) ? b4  : (idx == 4'd5 ) ? b5  :
-                      (idx == 4'd6 ) ? b6  : (idx == 4'd7 ) ? b7  :
-                      (idx == 4'd8 ) ? b8  : (idx == 4'd9 ) ? b9  :
-                      (idx == 4'd10) ? b10 : (idx == 4'd11) ? b11 :
-                      (idx == 4'd12) ? b12 : (idx == 4'd13) ? b13 :
-                      (idx == 4'd14) ? b14 : b15;
+wire [7:0] mux_byte = (idx == 5'd0 ) ? b0  : (idx == 5'd1 ) ? b1  :
+                      (idx == 5'd2 ) ? b2  : (idx == 5'd3 ) ? b3  :
+                      (idx == 5'd4 ) ? b4  : (idx == 5'd5 ) ? b5  :
+                      (idx == 5'd6 ) ? b6  : (idx == 5'd7 ) ? b7  :
+                      (idx == 5'd8 ) ? b8  : (idx == 5'd9 ) ? b9  :
+                      (idx == 5'd10) ? b10 : (idx == 5'd11) ? b11 :
+                      (idx == 5'd12) ? b12 : (idx == 5'd13) ? b13 :
+                      (idx == 5'd14) ? b14 : (idx == 5'd15) ? b15 :
+                      (idx == 5'd16) ? b16 : (idx == 5'd17) ? b17 :
+                      (idx == 5'd18) ? b18 : (idx == 5'd19) ? b19 :
+                      (idx == 5'd20) ? b20 : (idx == 5'd21) ? b21 :
+                      (idx == 5'd22) ? b22 : b23;
 
 always @(posedge clk or negedge rst_n) begin
     if(!rst_n) begin
@@ -141,7 +177,7 @@ always @(posedge clk or negedge rst_n) begin
         case(state)
             S_IDLE: begin
                 if(tx_now) begin
-                    idx   <= 4'd0;
+                    idx   <= 5'd0;
                     state <= S_REQ;
                 end
             end
@@ -154,9 +190,9 @@ always @(posedge clk or negedge rst_n) begin
             end
             S_WAIT: begin
                 if(tx_done) begin
-                    if(idx == 4'd15) state <= S_IDLE;
+                    if(idx == 5'd23) state <= S_IDLE;
                     else begin
-                        idx   <= idx + 4'd1;
+                        idx   <= idx + 5'd1;
                         state <= S_REQ;
                     end
                 end

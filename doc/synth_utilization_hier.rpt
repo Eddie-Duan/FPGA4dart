@@ -1,7 +1,7 @@
 Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
 -----------------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
-| Date         : Wed Sep 23 22:47:23 2026
+| Date         : Thu Sep 24 10:32:59 2026
 | Host         : EddieDuanLegionY7000P running 64-bit major release  (build 9200)
 | Command      : report_utilization -hierarchical -file C:/Users/DUANboyang/Desktop/FPGA4dart/doc/synth_utilization_hier.rpt
 | Design       : armor_vision
@@ -21,9 +21,9 @@ Table of Contents
 +-----------------------------------+--------------------------------+------------+------------+---------+------+------+--------+--------+------------+
 |              Instance             |             Module             | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs | RAMB36 | RAMB18 | DSP Blocks |
 +-----------------------------------+--------------------------------+------------+------------+---------+------+------+--------+--------+------------+
-| armor_vision                      |                          (top) |       6397 |       3789 |    2608 |    0 | 2661 |      0 |      0 |         13 |
+| armor_vision                      |                          (top) |       6424 |       3816 |    2608 |    0 | 2669 |      0 |      0 |         14 |
 |   (armor_vision)                  |                          (top) |        233 |        233 |       0 |    0 |  325 |      0 |      0 |          0 |
-|   u_blob_track                    |                     blob_track |       1361 |       1361 |       0 |    0 |  964 |      0 |      0 |          9 |
+|   u_blob_track                    |                     blob_track |       1379 |       1379 |       0 |    0 |  964 |      0 |      0 |         10 |
 |   u_chroma_hist                   |                    chroma_hist |        660 |        340 |     320 |    0 |  121 |      0 |      0 |          0 |
 |   u_dilate                        |                      morph_nxn |        181 |         77 |     104 |    0 |   72 |      0 |      0 |          0 |
 |     (u_dilate)                    |                      morph_nxn |         32 |         32 |       0 |    0 |   72 |      0 |      0 |          0 |
@@ -51,7 +51,7 @@ Table of Contents
 |     u_lb1                         |                 line_buffer_11 |        341 |        133 |     208 |    0 |    0 |      0 |      0 |          0 |
 |   u_osd                           |                       osd_text |        246 |        246 |       0 |    0 |  261 |      0 |      0 |          0 |
 |   u_overlay_box                   |                    overlay_box |        100 |        100 |       0 |    0 |    0 |      0 |      0 |          4 |
-|   u_reg_file                      |                       reg_file |         70 |         70 |       0 |    0 |   47 |      0 |      0 |          0 |
+|   u_reg_file                      |                       reg_file |         79 |         79 |       0 |    0 |   55 |      0 |      0 |          0 |
 |   u_result_frame                  |                   result_frame |         80 |         80 |       0 |    0 |  122 |      0 |      0 |          0 |
 |     (u_result_frame)              |                   result_frame |         53 |         53 |       0 |    0 |   91 |      0 |      0 |          0 |
 |     u_tx                          |                        uart_tx |         27 |         27 |       0 |    0 |   31 |      0 |      0 |          0 |

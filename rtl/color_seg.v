@@ -29,9 +29,8 @@
 
 `timescale 1ns / 1ps
 
-module color_seg #(
-    parameter [7:0] REL_SAT_PCT = 8'd20    // 相对饱和度下限（百分数）；0 = 关闭这道闸
-)(
+module color_seg (
+    input      [7:0]  rel_sat_pct ,   // 相对饱和度闸限（%，0 = 关闭该闸；运行时可变）
     input      [15:0] rgb565 ,   // RGB565 输入
     input      [7:0]  th_g   ,   // 绿色亮度下限（G >= TH_G）
     input      [7:0]  th_gr  ,   // G-R 差值下限
@@ -64,7 +63,7 @@ wire [7:0] mn   = (r8 < g8) ? ((r8 < b8) ? r8 : b8) : ((g8 < b8) ? g8 : b8);
 wire [7:0] chro = mx - mn;                    // 色度（最亮通道 - 最暗通道）
 
 wire [15:0] chro_pct = chro * 8'd100;         // <= 25500
-wire [15:0] mx_sat   = mx   * REL_SAT_PCT;    // REL_SAT_PCT 是常数 -> 常数乘法，不用 DSP
+wire [15:0] mx_sat   = mx   * rel_sat_pct;    // REL_SAT_PCT 是常数 -> 常数乘法，不用 DSP
 wire sat_ok = (chro_pct >= mx_sat);
 
 //*****************************************************

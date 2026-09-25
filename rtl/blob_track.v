@@ -37,10 +37,10 @@ module blob_track #(
     parameter AW       = 10         ,   // 坐标位宽
     parameter K        = 4          ,   // 最多同时跟踪的团块数
     parameter MIN_AREA = 400        ,   // 低于这个面积不算目标
-    parameter GAP_MAX  = 64         ,   // 允许的纵向间隙（行）；反光白带把灯切成上下
+    parameter ASPECT_SHIFT = 3         ,   // 宽松档的长宽比上限 = 2^SHIFT（8 -> 8:1）
+    parameter GAP_MAX  = 64             // 允许的纵向间隙（行）；反光白带把灯切成上下
                                         // 两块时靠它把两块并回一个团块。调小 = 更严格地区分
                                         // 上下相邻的多个目标
-    parameter AIM_H_Q8 = 8'd64          // 瞄准点偏移 = 宽度 x AIM_H_Q8/256
 )(
     input                 clk           ,
     input                 rst_n         ,
@@ -49,6 +49,10 @@ module blob_track #(
     input      [AW-1:0]   x             ,   // 当前像素 x
     input      [AW-1:0]   y             ,   // 当前行 y（1 基）
     input                 mask          ,   // 二值掩码
+    input      [15:0]     aim_h_q8      ,   // 瞄准点偏移 = 宽度 x aim_h_q8/256（Q0.8，
+                                             // 运行时可变，由 UART 0x05 / parameter 给）   // 二值掩码
+
+    input      [31:0]     min_area_lo   ,   // 宽松档最小面积（远/小目标）；0 = 关闭宽松档
 
     output reg            bond_valid    ,   // 本帧是否找到合格团块
     output reg [AW-1:0]   bond_l        ,
@@ -61,6 +65,7 @@ module blob_track #(
     output reg [AW-1:0]   aim_y         ,
     output reg [31:0]     blob_area     ,   // 最佳团块面积（像素数）
     output reg [2:0]      blob_cnt      ,   // 本帧合格团块数
+    output reg            blob_far      ,   // 选中的是宽松档（小而远）的目标
     output reg [AW-1:0]   cent_x        ,   // 形心（掩码质心，亚像素更接近真值）
     output reg [AW-1:0]   cent_y        ,
     output reg [7:0]      fill_q8           // 填充率 x256（圆约 201）
@@ -282,13 +287,39 @@ reg  [1:0]  best_i ;
 reg         best_any;
 reg  [31:0] best_are;
 reg  [2:0]  cnt_c   ;
+reg  [AW:0]  tw_c, th_c ;   // 候选块宽 / 高（+1 位防溢出）
+reg  [2*AW+1:0] tp_c    ;   // 宽 x 高
+reg          ss_ok      ;   // 宽松档的形状合理性
+reg          st_any     ;   // 宽松档是否已有候选
+reg  [31:0]  st_are     ;
+reg  [1:0]   st_i       ;
+reg          best_far   ;   // 最终选中的是宽松档
 
+//  两级门槛（这就是「远处小绿灯认不出来」的修复点）：
+//    强档：area >= MIN_AREA          -> 近处 / 大目标，优先
+//    宽松档：area >= min_area_lo 且形状合理 -> 远处 / 小目标
+//  旧版只有强档一条，MIN_AREA=400 时的远处小灯（几十像素）会被整块丢掉，
+//  于是 raw_valid=0 -> 「屏幕上有高亮但识别不到目标」。
+//  形状合理性只作用于宽松档（面积小的时候填充率 / 长宽比对噪声很敏感）：
+//    长宽比 <= 2^ASPECT_SHIFT，且 area*4 >= w*h（填充率 >= 1/4）
+//  -> 挡掉细长条（画面上的一条绿边）和空心块，但不挡 3x3 的小灯。
+//  min_area_lo = 0 时宽松档关闭，行为与旧版完全一致（逃生开关）。
 always @(*) begin
     best_i   = 2'd0;
     best_any = 1'b0;
     best_are = 32'd0;
     cnt_c    = 3'd0;
+    best_far = 1'b0;
+    st_any   = 1'b0;
+    st_are   = 32'd0;
+    st_i     = 2'd0;
     for(mi = 0; mi < K; mi = mi + 1) begin
+        tw_c = {1'b0, r_r[mi]} - {1'b0, r_l[mi]} + 1'b1;
+        th_c = {1'b0, r_b[mi]} - {1'b0, r_t[mi]} + 1'b1;
+        tp_c = tw_c * th_c;
+        ss_ok = (tw_c <= (th_c << ASPECT_SHIFT)) &&
+                (th_c <= (tw_c << ASPECT_SHIFT)) &&
+                ((r_area[mi] << 2) >= tp_c);
         if(r_used[mi] && (r_area[mi] >= MIN_AREA)) begin
             cnt_c = cnt_c + 3'd1;
             if(!best_any || (r_area[mi] > best_are)) begin
@@ -297,6 +328,21 @@ always @(*) begin
                 best_i   = mi[1:0];
             end
         end
+        else if(r_used[mi] && (min_area_lo != 32'd0) &&
+                (r_area[mi] >= min_area_lo) && ss_ok) begin
+            cnt_c = cnt_c + 3'd1;
+            if(!st_any || (r_area[mi] > st_are)) begin
+                st_any = 1'b1;
+                st_are = r_area[mi];
+                st_i   = mi[1:0];
+            end
+        end
+    end
+    if(!best_any && st_any) begin          // 没有强档 -> 用宽松档最好的那块
+        best_any = 1'b1;
+        best_are = st_are;
+        best_i   = st_i;
+        best_far = 1'b1;
     end
 end
 
@@ -312,8 +358,15 @@ wire [31:0]   bsel_y = r_s2y[best_i];
 wire [AW:0]   cx_w = ({1'b0, bsel_l} + {1'b0, bsel_r}) >> 1;
 wire [AW:0]   cy_w = ({1'b0, bsel_t} + {1'b0, bsel_b}) >> 1;
 wire [AW:0]   bw_w = {1'b0, bsel_r} - {1'b0, bsel_l} + 1'b1;
-wire [2*AW+8:0] up_full = bw_w * AIM_H_Q8;
+wire [2*AW+8:0] up_full = bw_w * aim_h_q8;
 wire [AW+8:0]   up_t    = up_full >> 8;
+
+//  饱和减法 aim_y = cy - up
+//  直接写 aim_y <= cy - up 时，两边按 10bit 运算，cy < up 就下溢回绕
+//  (绕到 1024 附近，十字跳到画面底部)。
+//  AIM_H_Q8 = 372 时偏移 = 1.449 x 灯宽，必然超过灯心 y，所以必须先补这里。
+wire [AW+8:0] cy_l = {9'd0, cy_w[AW-1:0]};
+wire [AW+8:0] ay_s = (cy_l >= up_t) ? (cy_l - up_t) : {(AW+9){1'b0}};
 
 //-------------------------------------------------------
 // 串行移位除法器（帧末算 3 次：cent_x / cent_y / fill）
@@ -342,6 +395,7 @@ always @(posedge clk or negedge rst_n) begin
         center_x <= {AW{1'b0}}; center_y <= {AW{1'b0}};
         aim_x <= {AW{1'b0}};    aim_y <= {AW{1'b0}};
         blob_area <= 32'd0;     blob_cnt <= 3'd0;
+        blob_far  <= 1'b0;
         cent_x <= {AW{1'b0}};   cent_y <= {AW{1'b0}};
         fill_q8 <= 8'd0;
         lat_x <= 32'd0; lat_y <= 32'd0; lat_a <= 32'd0;
@@ -354,6 +408,7 @@ always @(posedge clk or negedge rst_n) begin
     else if(vsync_fall) begin
         bond_valid <= best_any;
         blob_cnt   <= cnt_c;
+        blob_far   <= best_far;
         if(best_any) begin
             bond_l    <= bsel_l;
             bond_r    <= bsel_r;
@@ -362,7 +417,7 @@ always @(posedge clk or negedge rst_n) begin
             center_x  <= cx_w[AW-1:0];
             center_y  <= cy_w[AW-1:0];
             aim_x     <= cx_w[AW-1:0];
-            aim_y     <= cy_w[AW-1:0] - up_t[AW-1:0];
+            aim_y     <= ay_s[AW-1:0];       // 饱和，不回绕
             blob_area <= bsel_a;
             lat_x <= bsel_x;
             lat_y <= bsel_y;

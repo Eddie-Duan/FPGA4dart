@@ -22,22 +22,26 @@
 
 module overlay_box #(
     parameter AW      = 10,   // 坐标位宽
-    parameter RING_T  = 2 ,   // 圆环半宽（像素）
-    parameter CROSS_L = 12,   // 十字臂长（像素）
+    parameter RING_T  = 2 ,   // 圆环宽度（像素）
+    parameter CROSS_L = 12,   // 十字臂长度（像素）
     parameter CROSS_T = 1     // 十字线半宽（像素）
 )(
-    input                valid ,   // 边界框有效
+    input                valid ,   // 外框有效
     input      [AW-1:0]  x     ,   // 当前像素 x
     input      [AW-1:0]  y     ,   // 当前像素 y
     input      [AW-1:0]  bl    ,   // 左
     input      [AW-1:0]  br    ,   // 右
     input      [AW-1:0]  bt    ,   // 上
     input      [AW-1:0]  bb    ,   // 下
-    input      [AW-1:0]  cx    ,   // 圆心 x（圆环中心）
-    input      [AW-1:0]  cy    ,   // 圆心 y（圆环中心）
-    input      [AW-1:0]  ax    ,   // 瞄准点 x（十字中心）
-    input      [AW-1:0]  ay    ,   // 瞄准点 y（十字中心）
-    output               draw      // 1 = 这个像素要画标记
+    input      [AW-1:0]  cx    ,   // 圆心 x（外框中心）
+    input      [AW-1:0]  cy    ,   // 圆心 y（外框中心）
+    input      [AW-1:0]  ax    ,   // 瞄准点 x（当前帧几何瞄准点）
+    input      [AW-1:0]  ay    ,   // 瞄准点 y（当前帧几何瞄准点）
+    input      [AW-1:0]  pvx   ,   // 预测瞄准点 x
+    input      [AW-1:0]  pvy   ,   // 预测瞄准点 y
+    input                pv_on ,   // 1 = 画预测十字（目标在动时才画）
+    output               draw  ,   // 1 = 圆环 / 当前瞄准十字
+    output               draw_p    // 1 = 预测十字（画面合成为黄色）
 );
 
 //localparam define
@@ -74,6 +78,17 @@ wire on_v = (aadx <= CROSS_T) && (aady <= CROSS_L);   // 竖臂
 //**                    main code
 //*****************************************************
 
-assign draw = valid && (on_ring || on_h || on_v);
+//  预测十字：与瞄准十字同一套曼哈顿距离比较（省乘法器）
+//  注意：pv_on=0（静止 / 预测关闭 / 历史不足）时 draw_p 恒为 0，
+//  所以静止目标下的像素期望与改动前逐点一致。
+wire signed [AW:0] pvx_d = $signed({1'b0,x}) - $signed({1'b0,pvx});
+wire signed [AW:0] pvy_d = $signed({1'b0,y}) - $signed({1'b0,pvy});
+wire [AW:0] pvdx = pvx_d[AW] ? (~pvx_d + 1'b1) : pvx_d;
+wire [AW:0] pvdy = pvy_d[AW] ? (~pvy_d + 1'b1) : pvy_d;
+wire pv_h = (pvdy <= CROSS_T) && (pvdx <= CROSS_L);
+wire pv_v = (pvdx <= CROSS_T) && (pvdy <= CROSS_L);
+
+assign draw   = valid && (on_ring || on_h || on_v);
+assign draw_p = pv_on && valid && (pv_h || pv_v);
 
 endmodule
