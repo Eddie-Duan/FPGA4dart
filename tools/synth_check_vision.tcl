@@ -35,6 +35,7 @@ read_verilog [list \
     $rtl/median3x3.v \
     $rtl/blob_track.v \
     $rtl/track_ab.v \
+    $rtl/aim_predict.v \
     $rtl/chroma_hist.v \
     $rtl/vision_stat.v \
     $rtl/uart_tx.v \

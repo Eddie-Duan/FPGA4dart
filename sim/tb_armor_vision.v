@@ -102,10 +102,16 @@ reg [15:0] cap_in, cap_bg, cap_ring, cap_cctr, cap_aim;
 reg [31:0] err_cnt = 32'd0;
 
 // 做差要显式带符号，否则 px<400 时会变成无符号大数
-wire signed [11:0] dxc = $signed({1'b0,px}) - 12'sd400;
-wire signed [11:0] dyc = $signed({1'b0,py}) - 12'sd240;
+//  目标几何做成【可改】的：phase 10 缩小（模拟远灯），
+//  phase 11 逐帧平移（测速度预测），静止相位用默认值 400/240/10000。
+reg  [10:0] img_cx = 11'd400;
+reg  [10:0] img_cy = 11'd240;
+reg  [23:0] img_r2 = 24'd10000;
+
+wire signed [11:0] dxc = $signed({1'b0,px}) - $signed({1'b0,img_cx});
+wire signed [11:0] dyc = $signed({1'b0,py}) - $signed({1'b0,img_cy});
 wire [23:0] d2c = dxc*dxc + dyc*dyc;
-wire in_circle = (d2c <= 24'd10000);
+wire in_circle = (d2c <= img_r2);
 
 //*****************************************************
 //**                    main code
@@ -242,6 +248,7 @@ blob_track #(
     .y          (u_armor_vision.y_cnt   ),
     .mask       (u_armor_vision.mask_d  ),
     .aim_h_q8   (16'd372                ),
+    .min_area_lo(32'd8                  ),
     .bond_valid (real_valid             ),
     .bond_l     (                       ),
     .bond_r     (                       ),
@@ -252,6 +259,42 @@ blob_track #(
     .aim_x      (real_ax                ),
     .aim_y      (real_ay                ),
     .blob_area  (                       ),
+    .blob_cnt   (                       ),
+    .cent_x     (                       ),
+    .cent_y     (                       ),
+    .fill_q8    (                       )
+);
+
+//  对照组：同一个掩码，但把宽松档关掉（min_area_lo = 0）
+//  -> 远处的 200 像素小灯必须【认不到】，证明灵敏度是新宽松档带来的
+wire lo_valid;
+
+blob_track #(
+    .WIDTH    (800     ),
+    .HEIGHT   (480     ),
+    .AW       (10      ),
+    .MIN_AREA (400     )
+) u_blob_looff (
+    .clk        (clk                    ),
+    .rst_n      (rst_n                  ),
+    .vsync      (vsync                  ),
+    .de         (u_armor_vision.de_v    ),
+    .x          (u_armor_vision.x_v     ),
+    .y          (u_armor_vision.y_cnt   ),
+    .mask       (u_armor_vision.mask_d  ),
+    .aim_h_q8   (16'd64                 ),
+    .min_area_lo(32'd0                  ),
+    .bond_valid (lo_valid               ),
+    .bond_l     (                       ),
+    .bond_r     (                       ),
+    .bond_t     (                       ),
+    .bond_b     (                       ),
+    .center_x   (                       ),
+    .center_y   (                       ),
+    .aim_x      (                       ),
+    .aim_y      (                       ),
+    .blob_area  (                       ),
+    .blob_far   (                       ),
     .blob_cnt   (                       ),
     .cent_x     (                       ),
     .cent_y     (                       ),
@@ -285,6 +328,107 @@ end
 //-------------------------------------------------------
 // 检查任务
 //-------------------------------------------------------
+//-------------------------------------------------------
+// P1/P2 单测：result_frame v2 帧（24 字节）+ UART 接收监视器
+//   主实例每 TX_DIV=8 帧才发一次，测试台跑不到；这里用 TX_DIV=1 的独立实例，
+//   把已知常量打包发出来，再逐字节核对（含校验和）。
+//   校验和的期望值是在 Python 里【独立算】的，不是从收到的数据反推，
+//   所以能真正验到打包逻辑。
+//-------------------------------------------------------
+reg  [15:0] rf_div  = 16'd0;
+reg         rf_tick = 1'b0;
+always @(posedge clk) begin
+    if(!rst_n) begin rf_div <= 16'd0; rf_tick <= 1'b0; end
+    else begin
+        rf_div  <= (rf_div == 16'd4999) ? 16'd0 : (rf_div + 16'd1);
+        rf_tick <= (rf_div == 16'd4999);
+    end
+end
+
+wire rf_txd;
+
+result_frame #(
+    .CLK_FREQ (25_000_000),
+    .BAUD     (115200    ),
+    .TX_DIV   (1         )
+) u_rf_test (
+    .clk        (clk       ),
+    .rst_n      (rst_n     ),
+    .frame_tick (rf_tick   ),
+    .valid      (1'b1      ),
+    .cx         (10'd408   ),
+    .cy         (10'd248   ),
+    .ax         (10'd408   ),
+    .ay         (10'd198   ),
+    .bw         (11'd201   ),
+    .area       (32'd32000 ),
+    .fill_q8    (8'd200    ),
+    .blob_cnt   (3'd1      ),
+    .adapt_ok   (1'b1      ),
+    .disp_bin   (1'b0      ),
+    .pred_ok    (1'b1      ),
+    .moving     (1'b1      ),
+    .far_small  (1'b0      ),
+    .vx_q4      (16'sd96   ),   // 6.0 px/帧
+    .vy_q4      (16'sd0    ),
+    .px         (10'd440   ),
+    .py         (10'd248   ),
+    .txd        (rf_txd    )
+);
+
+//  115200 @ 25MHz = 217 拍/位；起始位下降沿后等 1.5 位再每 217 拍采一次
+localparam integer UART_DIV = 217;
+reg  [7:0]  ur_b [0:23];
+reg  [5:0]  ur_n    = 6'd0;
+reg         ur_act  = 1'b0;
+reg         ur_done = 1'b0;
+reg  [15:0] ur_wait = 16'd0;
+reg  [3:0]  ur_bs   = 4'd0;
+reg  [7:0]  ur_sh   = 8'd0;
+integer     uk;
+
+always @(posedge clk or negedge rst_n) begin
+    if(!rst_n) begin
+        ur_act <= 1'b0; ur_done <= 1'b0; ur_n <= 6'd0;
+        ur_wait <= 16'd0; ur_bs <= 4'd0; ur_sh <= 8'd0;
+    end
+    else if(!ur_act) begin
+        if(!ur_done && (rf_txd == 1'b0)) begin     // 起始位下降沿
+            ur_act  <= 1'b1;
+            ur_bs   <= 4'd0;
+            ur_sh   <= 8'd0;
+            ur_wait <= 16'd325;                    // 1.5 位 -> 采到 d0 中点
+        end
+    end
+    else if(ur_wait == 16'd0) begin
+        if(ur_bs < 4'd8) begin
+            ur_sh   <= {rf_txd, ur_sh[7:1]};
+            ur_bs   <= ur_bs + 4'd1;
+            ur_wait <= 16'd216;                    // 每 217 拍一位
+        end
+        else begin                                 // 停止位 -> 收完一个字节
+            if(ur_n < 6'd24) begin
+                ur_b[ur_n] <= ur_sh;
+                ur_n <= ur_n + 6'd1;
+                if(ur_n == 6'd23) ur_done <= 1'b1;  // 第一帧收满 24 字节就冻结
+            end
+            ur_act <= 1'b0;
+        end
+    end
+    else ur_wait <= ur_wait - 16'd1;
+end
+
+//  收到的帧自校验：byte2..byte22 异或 == byte23
+function [7:0] ur_chk_calc;
+    input        dmy;      // Verilog 要求函数至少一个输入
+    integer      ck;
+    begin
+        ck = 0;
+        for(uk = 2; uk <= 22; uk = uk + 1) ck = ck ^ ur_b[uk];
+        ur_chk_calc = ck[7:0];
+    end
+endfunction
+
 task chk;
     input [8*16-1:0] name;
     input [31:0]     got;
@@ -409,6 +553,19 @@ task ta_frame;
         @(negedge clk);
         ta_vsync = 1'b0;
         repeat(4) @(posedge clk);
+    end
+endtask
+
+//  逐帧平移目标：在帧边界之后改 img_cx，避免和 posedge 抢同一个 active 区域
+task move_target;
+    input integer n;
+    input integer dx;
+    integer mk;
+    begin
+        for(mk = 0; mk < n; mk = mk + 1) begin
+            wait_frames(1);
+            img_cx = img_cx + dx;
+        end
     end
 endtask
 
@@ -581,6 +738,68 @@ initial begin
     ta_frame(1'b0);
     chk("ta_drop_valid",  {31'b0, ta_valid}, 32'd0);
 
+    //=====================================================
+    //  灵敏度相位：远处的【小绿灯】也必须被认出来
+    //  旧代码：area < MIN_AREA(400) -> 最大的那块也被丢掉 -> valid=0，
+    //  现场表现就是「屏幕上有高亮，但识别不到目标」。
+    //  半径 8 的圆 -> 约 200 像素，落在新的【宽松档】(>= min_area_lo=8)
+    //=====================================================
+    $display("---- phase 10 : FAR / SMALL lamp (r=8, ~200 px) ----");
+    img_r2 = 24'd64;
+    wait_frames(3);
+    chk("far_valid",  bond_valid, 32'd1);
+    chk("far_flag",   {31'b0, u_armor_vision.raw_far}, 32'd1);
+    chk_range("far_w", u_armor_vision.bond_w, 32'd12, 32'd22);
+    chk_near("far_cx", center_x, 32'd408, 32'd3);
+    chk_near("far_cy", center_y, 32'd248, 32'd3);
+    //  同一个掩码再喂一个【宽松档关闭】的实例：必须回到旧行为（认不到小灯），
+    //  证明「有绿灯就认」确实是新的宽松档在起作用，而不是别的地方整体松了
+    chk("far_lo_off", {31'b0, lo_valid}, 32'd0);
+
+    //=====================================================
+    //  速度预测相位：目标 +6 px/帧 平移 8 帧
+    //  期望：vx 收敛到约 6.0 px/帧（Q4 = 96）；提前量 = v*LEAD/16/256
+    //  LEAD_Q4=64（4.0 帧）-> pd_cx 应比当前 center_x 超前 8~48 像素
+    //=====================================================
+    $display("---- phase 11 : MOVING lamp + velocity lead prediction ----");
+    img_r2 = 24'd10000;
+    img_cx = 11'd400;
+    img_cy = 11'd240;
+    wait_frames(3);
+    chk("near_lo_off", {31'b0, lo_valid}, 32'd1);   // 大目标：严档照样认
+    move_target(8, 6);
+    chk("mov_pred_ok", {31'b0, u_armor_vision.pd_ok}, 32'd1);
+    chk("mov_flag",    {31'b0, u_armor_vision.pd_mov}, 32'd1);
+    chk("mov_vx_pos",  (u_armor_vision.pd_vx > 16'sd48), 32'd1);
+    chk("mov_lead_dir",(u_armor_vision.pd_cx > center_x), 32'd1);
+    chk_range("mov_lead_amt",
+              {22'b0, u_armor_vision.pd_cx} - {22'b0, center_x}, 32'd8, 32'd48);
+    chk("mov_ay_inside", (u_armor_vision.pd_ay <= center_y), 32'd1);
+    img_cx = 11'd400;
+    wait_frames(2);
+
+    //=====================================================
+    $display("---- phase 12 : result_frame v2 (24 bytes) over UART ----");
+    //=====================================================
+    wait(ur_done);
+    repeat(20) @(posedge clk);
+    chk("uart_nbytes", {26'd0, ur_n}, 32'd24);
+    chk("uart_hdr0",   {24'd0, ur_b[0]},  32'hA5);
+    chk("uart_hdr1",   {24'd0, ur_b[1]},  32'h5A);
+    chk("uart_flags",  {24'd0, ur_b[2]},  32'hB3);   // v2 标志 + pred/moving/adapt/valid
+    chk("uart_cx",     ({22'b0, ur_b[3]} << 8) | {24'd0, ur_b[4]}, 32'd408);
+    chk("uart_cy",     ({22'b0, ur_b[5]} << 8) | {24'd0, ur_b[6]}, 32'd248);
+    chk("uart_ay",     ({22'b0, ur_b[9]} << 8) | {24'd0, ur_b[10]}, 32'd198);
+    chk("uart_w",      {24'd0, ur_b[11]}, 32'd201);
+    chk("uart_area7",  {24'd0, ur_b[12]}, 32'd250);
+    chk("uart_fill",   {24'd0, ur_b[13]}, 32'd200);
+    chk("uart_vx",     ({22'b0, ur_b[15]} << 8) | {24'd0, ur_b[16]}, 32'd96);
+    chk("uart_vy",     ({22'b0, ur_b[17]} << 8) | {24'd0, ur_b[18]}, 32'd0);
+    chk("uart_px",     ({22'b0, ur_b[19]} << 8) | {24'd0, ur_b[20]}, 32'd440);
+    chk("uart_py",     ({22'b0, ur_b[21]} << 8) | {24'd0, ur_b[22]}, 32'd248);
+    chk("uart_chk",    {24'd0, ur_chk_calc(1'b0)}, 32'h56);   // Python 独立算的期望值
+
+    //=====================================================
     if(err_cnt == 32'd0)
         $display("==== ALL CHECKS PASSED ====");
     else

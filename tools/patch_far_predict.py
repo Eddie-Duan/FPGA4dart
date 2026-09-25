@@ -411,4 +411,160 @@ else:
             "                        idx   <= idx + 5'd1;", 'result_frame idx 递增')
     save(rel, t, enc, crlf, raw)
 
+#==========================================================================
+# 6) rtl/armor_vision.v  -- 接线：两级门槛 + 预测模块 + 黄色预测十字
+#==========================================================================
+rel = 'rtl/armor_vision.v'
+raw, t, enc, crlf = load(rel)
+if 'pd_cx' in t:
+    print('[skip] %s 已打过补丁' % rel)
+else:
+    # 6a) 参数
+    t = resub(t,
+              r'( *parameter MIN_AREA    = 400        ,[^\n]*\n)',
+              r'\1'
+              '    //  ---- 灵敏度 / 速度预测（新增）----\n'
+              '    parameter MIN_AREA_LO_DEF = 32\'d8  ,   // 宽松档最小面积：远 / 小绿灯也算目标（0 = 关闭）\n'
+              '    parameter PRED_EN         = 1\'b1   ,   // 速度预测（lead）总开关\n'
+              '    parameter [7:0] LEAD_Q4_DEF = 8\'d64,   // 提前量：帧数 x16（64 = 4.0 帧，30fps 约 133ms）\n',
+              'armor_vision 参数')
+
+    # 6b) 新增 wire
+    t = resub(t,
+              r'(wire \[7:0\]    rf_aim_h, rf_ring_t, rf_ctrl, rf_gate, rf_pct;\n)',
+              r'\1'
+              'wire [7:0]    rf_lead_q4 ;\n',
+              'armor_vision rf_lead_q4')
+    t = resub(t,
+              r'(wire \[19:0\]   osd_hrdata;\n)',
+              r'\1'
+              '\n'
+              '//  ---- 灵敏度 / 速度预测（新增）----\n'
+              'wire [31:0]   min_area_lo_eff;   // 宽松档面积门槛（运行时）\n'
+              'wire [7:0]    rel_sat_eff    ;   // 相对饱和度闸限（运行时）\n'
+              'wire [7:0]    lead_q4_eff    ;   // 预测提前量（运行时）\n'
+              'wire          raw_far        ;   // 命中的是宽松档（小 / 远目标）\n'
+              'wire [AW-1:0] pd_cx, pd_cy, pd_ay;   // 预测灯心 / 预测瞄准点 y\n'
+              'wire signed [15:0] pd_vx, pd_vy   ;  // 速度估计 Q4\n'
+              'wire          pd_ok, pd_mov   ;   // 预测有效 / 目标在动\n'
+              'wire          draw_p          ;   // 预测十字（黄色）\n',
+              'armor_vision 预测 wire')
+
+    # 6c) reg_file 例化：接上 lead
+    t = resub(t,
+              r'(    \.r_pct      \(rf_pct      \),\n)',
+              r'\1'
+              '    .r_lead_q4  (rf_lead_q4 ),\n',
+              'armor_vision reg_file 例化')
+
+    # 6d) ctrl 位
+    t = resub(t,
+              r'(wire osd_on_e = OSD_EN   \| rf_ctrl\[4\];\n)',
+              r'\1'
+              'wire pred_on  = PRED_EN  | rf_ctrl[5];   // b5 = 速度预测使能\n',
+              'armor_vision pred_on')
+
+    # 6e) 运行时生效值
+    t = resub(t,
+              r'(assign disp_bin = disp_bin_k \| rf_ctrl\[3\];\n)',
+              r'\1'
+              '\n'
+              '//  宽松档面积门槛（UART 0x04）：写过寄存器就用寄存器值，否则用 parameter 默认\n'
+              'wire [31:0] min_area_lo_eff = reg_written ? {24\'d0, rf_min_size} : MIN_AREA_LO_DEF;\n'
+              '//  相对饱和度闸限（UART 0x03）：以前是死寄存器，现在真的接上了\n'
+              'wire [7:0]  rel_sat_eff     = reg_written ? rf_rel_sat : REL_SAT_PCT;\n'
+              '//  预测提前量（UART 0x0A）\n'
+              'wire [7:0]  lead_q4_eff     = reg_written ? rf_lead_q4 : LEAD_Q4_DEF;\n',
+              'armor_vision 生效值')
+
+    # 6f) color_seg：参数 -> 端口
+    t = resub(t,
+              r'color_seg #\(\n    \.REL_SAT_PCT \(REL_SAT_PCT\)\n\) u_color_seg \(\n',
+              'color_seg u_color_seg (\n'
+              '    .rel_sat_pct (rel_sat_eff),\n',
+              'armor_vision color_seg 例化')
+
+    # 6g) blob_track：接上宽松门槛 / 远目标标志
+    t = resub(t,
+              r'(    \.mask       \(mask_d     \),\n)',
+              r'\1'
+              '    .min_area_lo (min_area_lo_eff),   // 宽松档：远 / 小目标也要认出来\n',
+              'armor_vision blob_track min_area_lo')
+    t = resub(t,
+              r'(    \.cent_x     \(cent_x     \),\n)',
+              '    .blob_far   (raw_far    ),\n'
+              r'\1',
+              'armor_vision blob_track blob_far')
+
+    # 6h) 预测模块：插在 track_ab 之后
+    t = resub(t,
+              r'(    \.lost_cnt  \(trk_lost  \)\n\);\n)',
+              r'\1'
+              '\n'
+              '//-------------------------------------------------------\n'
+              '// (9b) 速度预测（lead）：用最近几帧灯心外推「飞镖飞到时灯在哪」\n'
+              '//   TRK_EN=0 时喂 raw_*（不加延迟，舵机跟踪要的就是快）；\n'
+              '//   TRK_EN=1 时喂跟踪后的值（更稳，但慢 HIT_N 帧 -> 自己权衡）。\n'
+              '//   pred_ok=0（历史不足 / 关闭）时输出直接镜像输入，等于不预测。\n'
+              '//-------------------------------------------------------\n'
+              'aim_predict #(\n'
+              '    .AW     (AW    ),\n'
+              '    .WIDTH  (IMG_W ),\n'
+              '    .HEIGHT (IMG_H )\n'
+              ') u_aim_predict (\n'
+              '    .clk       (clk       ),\n'
+              '    .rst_n     (rst_n     ),\n'
+              '    .vsync     (vsync     ),\n'
+              '    .en        (pred_on   ),\n'
+              '    .raw_valid (TRK_EN ? trk_valid : raw_valid),\n'
+              '    .cx        (TRK_EN ? trk_cx    : raw_cx   ),\n'
+              '    .cy        (TRK_EN ? trk_cy    : raw_cy   ),\n'
+              '    .bw        (bond_w    ),\n'
+              '    .aim_h_q8  (aim_h_eff ),\n'
+              '    .lead_q4   (lead_q4_eff),\n'
+              '    .pcx       (pd_cx     ),\n'
+              '    .pcy       (pd_cy     ),\n'
+              '    .pay       (pd_ay     ),\n'
+              '    .vx_q4     (pd_vx     ),\n'
+              '    .vy_q4     (pd_vy     ),\n'
+              '    .pred_ok   (pd_ok     ),\n'
+              '    .moving    (pd_mov    )\n'
+              ');\n',
+              'armor_vision aim_predict 例化')
+
+    # 6i) overlay：预测十字
+    t = resub(t,
+              r'(    \.ay    \(aim_y     \),\n    \.draw  \(draw      \)\n\);\n)',
+              '    .ay    (aim_y     ),\n'
+              '    .pvx   (pd_cx     ),   // 预测瞄准点（黄色十字，只在目标在动时画）\n'
+              '    .pvy   (pd_ay     ),\n'
+              '    .pv_on (pd_mov    ),\n'
+              '    .draw  (draw      ),\n'
+              '    .draw_p(draw_p    )\n'
+              ');\n',
+              'armor_vision overlay 例化')
+
+    # 6j) 画面合成：预测十字用黄色（RED 优先，其次黄，然后 OSD，最后画面）
+    t = sub(t,
+            "assign data_out = draw ? 16'hF800 : (osd_on ? osd_color : disp_pix);",
+            "assign data_out = draw   ? 16'hF800 :               // 红色：圆环 + 当前几何瞄准十字\n"
+            "                  draw_p ? 16'hFFE0 :               // 黄色：预测瞄准点（lead）\n"
+            "                  osd_on ? osd_color : disp_pix;",
+            'armor_vision 显示合成')
+
+    # 6k) result_frame：接上预测字段
+    t = resub(t,
+              r'(    \.txd        \(uart_txd   \)\n)',
+              '    .pred_ok    (pd_ok      ),\n'
+              '    .moving     (pd_mov     ),\n'
+              '    .far_small  (raw_far    ),\n'
+              '    .vx_q4      (pd_vx      ),\n'
+              '    .vy_q4      (pd_vy      ),\n'
+              '    .px         (pd_cx      ),\n'
+              '    .py         (pd_cy      ),\n'
+              r'\1',
+              'armor_vision result_frame 例化')
+    save(rel, t, enc, crlf, raw)
+
+
 print('\n=== RTL 补丁完成 ===')

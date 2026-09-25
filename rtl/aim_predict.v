@@ -1,82 +1,82 @@
 `timescale 1ns / 1ps
 //****************************************************************************************//
 // File name:           aim_predict
-// Descriptions:        速度预测（lead 提前量）—— 预测飞镖到底该指向哪里
+// Descriptions:        �ٶ�Ԥ�⣨lead ��ǰ�������� Ԥ����ڵ��׸�ָ������
 //
-//   为什么需要：
-//     舵机跟踪只要「绿灯现在在哪」；但要打中，需要「飞镖飞到的时候灯在哪」。
-//     飞镖飞行时间约 0.1~0.3s（随距离变），这段时间目标会移动，
-//     直接瞄当前灯心必然滞后，等于永远差一个「飞行时间 x 目标速度」。
-//     本模块用最近几帧的灯心做速度估计（Q4 定点，单位 px/帧），外推 LEAD 帧，
-//     输出【预测灯心】和【预测瞄准点】，直接给云台 / 飞控用。
+//   Ϊʲô��Ҫ��
+//     �������ֻҪ���̵��������ġ�����Ҫ���У���Ҫ�����ڷɵ���ʱ������ġ���
+//     ���ڷ���ʱ��Լ 0.1~0.3s�������䣩�����ʱ��Ŀ����ƶ���
+//     ֱ���鵱ǰ���ı�Ȼ�ͺ󣬵�����Զ��һ��������ʱ�� x Ŀ���ٶȡ���
+//     ��ģ���������֡�ĵ������ٶȹ��ƣ�Q4 ���㣬��λ px/֡�������� LEAD ֡��
+//     �����Ԥ����ġ��͡�Ԥ����׼�㡿��ֱ�Ӹ���̨ / �ɿ��á�
 //
-//   时序（和 blob_track / track_ab 同一套写法）：
-//     frame_end = vsync 下降沿延一拍。
-//     为什么要延一拍：blob_track 在 vsync_fall 那一拍更新输出，如果本模块也在同一拍
-//     取用，nonblocking 语义下拿到的是【上一帧】的值（多滞后一帧）。延一拍后
-//     读到的是「刚刚结束那一帧」的 raw_*，正好是最新观测。
-//     （这个「同一拍改激励 / 取结果」的坑在 track_ab 那里踩过一次，见 doc 第 16 节。）
+//   ʱ�򣨺� blob_track / track_ab ͬһ��д������
+//     frame_end = vsync �½�����һ�ġ�
+//     ΪʲôҪ��һ�ģ�blob_track �� vsync_fall ��һ�ĸ�������������ģ��Ҳ��ͬһ��
+//     ȡ�ã�nonblocking �������õ����ǡ���һ֡����ֵ�����ͺ�һ֡������һ�ĺ�
+//     �������ǡ��ոս�����һ֡���� raw_*�����������¹۲⡣
+//     �������ͬһ�ĸļ��� / ȡ������Ŀ��� track_ab ����ȹ�һ�Σ��� doc �� 16 �ڡ���
 //
-//   速度估计（Q4：1 px/帧 记为 16）：
+//   �ٶȹ��ƣ�Q4��1 px/֡ ��Ϊ 16����
 //       d4 = (cx - cx_prev) << 4
-//       v  <= v + ((d4 - v) >>> VSHIFT)          // VSHIFT=2 -> alpha=0.25，抗单帧抖动
-//   预测（LEAD_Q4 同 Q4：64 = 4.0 帧，30fps 下约 133ms）：
+//       v  <= v + ((d4 - v) >>> VSHIFT)          // VSHIFT=2 -> alpha=0.25������֡����
+//   Ԥ�⣨LEAD_Q4 ͬ Q4��64 = 4.0 ֡��30fps ��Լ 133ms����
 //       off = (v * LEAD_Q4) >>> 8
-//       pcx = clamp(cx + off)                    // 饱和到画面内，不回绕
-//       pay = pcy - up,   up = bw * aim_h_q8 / 256    // 与 blob_track 同一公式 + 饱和
+//       pcx = clamp(cx + off)                    // ���͵������ڣ�������
+//       pay = pcy - up,   up = bw * aim_h_q8 / 256    // �� blob_track ͬһ��ʽ + ����
 //
-//   历史不足（连续有效帧 < 2）或 raw_valid=0 时：pred_ok = 0，
-//   输出【直接镜像当前帧】，等于不预测。
-//   => 静止目标下本模块开 / 关的输出完全一样，不会改变已经验收过的行为。
+//   ��ʷ���㣨������Ч֡ < 2���� raw_valid=0 ʱ��pred_ok = 0��
+//   �����ֱ�Ӿ���ǰ֡�������ڲ�Ԥ�⡣
+//   => ��ֹĿ���±�ģ�鿪 / �ص������ȫһ��������ı��Ѿ����չ�����Ϊ��
 //
-//   资源：2 个乘法器（v x LEAD、bw x aim_h），约 200 LUT / 150 FF，0 BRAM / 2 DSP。
+//   ��Դ��2 ���˷�����v x LEAD��bw x aim_h����Լ 200 LUT / 150 FF��0 BRAM / 2 DSP��
 //****************************************************************************************//
 module aim_predict #(
-    parameter AW            = 10    ,   // 坐标位宽
-    parameter WIDTH         = 800   ,   // 图像宽
-    parameter HEIGHT        = 480   ,   // 图像高
-    parameter [7:0] VSHIFT  = 8'd2  ,   // 速度平滑：(新 - 旧) >>> VSHIFT
-    parameter [7:0] MOVE_Q4 = 8'd16     // |vx|+|vy| >= 它才算「在动」（16 = 1 px/帧）
+    parameter AW            = 10    ,   // ����λ��
+    parameter WIDTH         = 800   ,   // ͼ���
+    parameter HEIGHT        = 480   ,   // ͼ���
+    parameter [7:0] VSHIFT  = 8'd2  ,   // �ٶ�ƽ����(�� - ��) >>> VSHIFT
+    parameter [7:0] MOVE_Q4 = 8'd16     // |vx|+|vy| >= �����㡸�ڶ�����16 = 1 px/֡��
 )(
     input                    clk       ,
     input                    rst_n     ,
     input                    vsync     ,
-    input                    en        ,   // PRED_EN（总开关）
-    input                    raw_valid ,   // blob_track 本帧是否找到团块
-    input      [AW-1:0]      cx        ,   // 本帧灯心 x
-    input      [AW-1:0]      cy        ,   // 本帧灯心 y
-    input      [AW:0]        bw        ,   // 本帧灯宽（算几何偏移用）
-    input      [15:0]        aim_h_q8  ,   // 几何偏移 = 宽度 x aim_h_q8/256
-    input      [7:0]         lead_q4   ,   // 提前量（帧 x16）
+    input                    en        ,   // PRED_EN���ܿ��أ�
+    input                    raw_valid ,   // blob_track ��֡�Ƿ��ҵ��ſ�
+    input      [AW-1:0]      cx        ,   // ��֡���� x
+    input      [AW-1:0]      cy        ,   // ��֡���� y
+    input      [AW:0]        bw        ,   // ��֡�ƿ����㼸��ƫ���ã�
+    input      [15:0]        aim_h_q8  ,   // ����ƫ�� = ���� x aim_h_q8/256
+    input      [7:0]         lead_q4   ,   // ��ǰ����֡ x16��
 
-    output reg [AW-1:0]      pcx       ,   // 预测灯心 x
-    output reg [AW-1:0]      pcy       ,   // 预测灯心 y
-    output reg [AW-1:0]      pay       ,   // 预测瞄准点 y（= pcy - 几何偏移，饱和）
-    output reg signed [15:0] vx_q4     ,   // 速度估计 Q4（px/帧 x16，带符号）
+    output reg [AW-1:0]      pcx       ,   // Ԥ����� x
+    output reg [AW-1:0]      pcy       ,   // Ԥ����� y
+    output reg [AW-1:0]      pay       ,   // Ԥ����׼�� y��= pcy - ����ƫ�ƣ����ͣ�
+    output reg signed [15:0] vx_q4     ,   // �ٶȹ��� Q4��px/֡ x16�������ţ�
     output reg signed [15:0] vy_q4     ,
-    output reg               pred_ok   ,   // 预测有效（连续有效帧 >= 2）
-    output reg               moving        // 目标在动（超过 MOVE_Q4）
+    output reg               pred_ok   ,   // Ԥ����Ч��������Ч֡ >= 2��
+    output reg               moving        // Ŀ���ڶ������� MOVE_Q4��
 );
 
 //localparam
-localparam VW = AW + 6;                     // 速度 / 位置的内部位宽（AW=10 -> 16bit）
+localparam VW = AW + 6;                     // �ٶ� / λ�õ��ڲ�λ����AW=10 -> 16bit��
 localparam signed [VW-1:0] W_MAXV = WIDTH  - 1;
 localparam signed [VW-1:0] H_MAXV = HEIGHT - 1;
 
 //reg define
 reg                  vsync_d  ;
 reg                  frame_end;
-reg  [AW-1:0]        cx_p     ;   // 上一帧灯心
+reg  [AW-1:0]        cx_p     ;   // ��һ֡����
 reg  [AW-1:0]        cy_p     ;
-reg  [1:0]           hist     ;   // 连续有效帧数（饱和到 3）
-reg  signed [VW-1:0] vx_s     ;   // 速度状态（Q4）
+reg  [1:0]           hist     ;   // ������Ч֡�������͵� 3��
+reg  signed [VW-1:0] vx_s     ;   // �ٶ�״̬��Q4��
 reg  signed [VW-1:0] vy_s     ;
 
 //wire define
 wire vsync_fall = ~vsync & vsync_d;
 
 //-------------------------------------------------------
-// 帧边界：延一拍，读到的是刚刚结束那一帧的结果
+// ֡�߽磺��һ�ģ��������Ǹոս�����һ֡�Ľ��
 //-------------------------------------------------------
 always @(posedge clk or negedge rst_n) begin
     if(!rst_n) begin
@@ -90,8 +90,8 @@ always @(posedge clk or negedge rst_n) begin
 end
 
 //-------------------------------------------------------
-// 速度估计（组合）
-//   只有「连续有效」才更新；丢帧时清零，不拿丢弃帧的残值去估速度
+// �ٶȹ��ƣ���ϣ�
+//   ֻ�С�������Ч���Ÿ��£���֡ʱ���㣬���ö���֡�Ĳ�ֵȥ���ٶ�
 //-------------------------------------------------------
 wire signed [VW-1:0] dx4 = ($signed({1'b0, cx}) - $signed({1'b0, cx_p})) <<< 4;
 wire signed [VW-1:0] dy4 = ($signed({1'b0, cy}) - $signed({1'b0, cy_p})) <<< 4;
@@ -104,15 +104,15 @@ wire signed [VW-1:0] vxn = use_pred ? nvx : {VW{1'b0}};
 wire signed [VW-1:0] vyn = use_pred ? nvy : {VW{1'b0}};
 
 //-------------------------------------------------------
-// 外推：off = (v * LEAD_Q4) >>> 8   （Q4 x Q4 -> 整数像素）
-//   饱和由 clamp 负责；|off| <= 32767*255/256 < 32767，不会溢出 16bit
+// ���ƣ�off = (v * LEAD_Q4) >>> 8   ��Q4 x Q4 -> �������أ�
+//   ������ clamp ����|off| <= 32767*255/256 < 32767��������� 16bit
 //-------------------------------------------------------
 wire signed [31:0]   mulx = vxn * $signed({1'b0, lead_q4});
 wire signed [31:0]   muly = vyn * $signed({1'b0, lead_q4});
 wire signed [VW-1:0] offx = mulx >>> 8;
 wire signed [VW-1:0] offy = muly >>> 8;
 
-//  饱和到画面内（不回绕）
+//  ���͵������ڣ������ƣ�
 function [AW-1:0] clampw;
     input signed [VW-1:0] v;
     begin
@@ -135,7 +135,7 @@ wire [AW-1:0] pcx_c = clampw($signed({1'b0, cx}) + offx);
 wire [AW-1:0] pcy_c = clamph($signed({1'b0, cy}) + offy);
 
 //-------------------------------------------------------
-// 几何偏移（和 blob_track 完全同一公式，保证静止时逐位一致）
+// ����ƫ�ƣ��� blob_track ��ȫͬһ��ʽ����֤��ֹʱ��λһ�£�
 //-------------------------------------------------------
 wire [2*AW+8:0] up_full = bw * aim_h_q8;
 wire [AW+8:0]   up_t    = up_full >> 8;
@@ -145,7 +145,7 @@ wire [AW+8:0]   pay_p   = (pcy_l >= up_t) ? (pcy_l - up_t) : {(AW+9){1'b0}};
 wire [AW+8:0]   pay_r   = (cy_l  >= up_t) ? (cy_l  - up_t) : {(AW+9){1'b0}};
 
 //-------------------------------------------------------
-// 「在动」判定：|vx| + |vy| >= MOVE_Q4
+// ���ڶ����ж���|vx| + |vy| >= MOVE_Q4
 //-------------------------------------------------------
 function [VW-1:0] vabs;
     input signed [VW-1:0] v;
@@ -158,7 +158,7 @@ wire [VW:0] aspd     = {1'b0, vabs(vxn)} + {1'b0, vabs(vyn)};
 wire        moving_c = use_pred && (aspd >= MOVE_Q4);
 
 //-------------------------------------------------------
-// 帧末更新
+// ֡ĩ����
 //-------------------------------------------------------
 always @(posedge clk or negedge rst_n) begin
     if(!rst_n) begin
@@ -188,7 +188,7 @@ always @(posedge clk or negedge rst_n) begin
             pay <= pay_p[AW-1:0];
         end
         else begin
-            pcx <= cx;                  // 历史不足 / 关闭 / 本帧无效 -> 镜像当前帧
+            pcx <= cx;                  // ��ʷ���� / �ر� / ��֡��Ч -> ����ǰ֡
             pcy <= cy;
             pay <= pay_r[AW-1:0];
         end

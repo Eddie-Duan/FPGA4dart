@@ -69,6 +69,10 @@ module armor_vision #(
 
     //  ---- P3：团块跟踪 ----
     parameter MIN_AREA    = 400        ,   // 低于该面积不算目标
+    //  ---- 灵敏度 / 速度预测（新增）----
+    parameter MIN_AREA_LO_DEF = 32'd8  ,   // 宽松档最小面积：远 / 小绿灯也算目标（0 = 关闭）
+    parameter PRED_EN         = 1'b1   ,   // 速度预测（lead）总开关
+    parameter [7:0] LEAD_Q4_DEF = 8'd64,   // 提前量：帧数 x16（64 = 4.0 帧，30fps 约 133ms）
     //  ---- P4：时序跟踪 ----
     parameter TRK_EN      = 1'b0       ,   // 默认关（保持原有逐帧行为）
     parameter GATE        = 96         ,   // 门控半径（像素）
@@ -163,6 +167,7 @@ wire          adapt_ok;
 //  ---- P2 寄存器文件 ----
 wire [7:0]    rf_th_g, rf_th_gr, rf_th_gb, rf_rel_sat, rf_min_size;
 wire [7:0]    rf_aim_h, rf_ring_t, rf_ctrl, rf_gate, rf_pct;
+wire [7:0]    rf_lead_q4 ;
 wire          rf_wr_pulse;
 wire [7:0]    rx_data;
 wire          rx_done;
@@ -183,6 +188,16 @@ wire          osd_on;
 wire [15:0]   osd_color;
 wire [7:0]    osd_hraddr;
 wire [19:0]   osd_hrdata;
+
+//  ---- 灵敏度 / 速度预测（新增）----
+wire [31:0]   min_area_lo_eff;   // 宽松档面积门槛（运行时）
+wire [7:0]    rel_sat_eff    ;   // 相对饱和度闸限（运行时）
+wire [7:0]    lead_q4_eff    ;   // 预测提前量（运行时）
+wire          raw_far        ;   // 命中的是宽松档（小 / 远目标）
+wire [AW-1:0] pd_cx, pd_cy, pd_ay;   // 预测灯心 / 预测瞄准点 y
+wire signed [15:0] pd_vx, pd_vy   ;  // 速度估计 Q4
+wire          pd_ok, pd_mov   ;   // 预测有效 / 目标在动
+wire          draw_p          ;   // 预测十字（黄色）
 
 //*****************************************************
 //**                    main code
@@ -274,6 +289,7 @@ reg_file u_reg_file (
     .r_ctrl     (rf_ctrl     ),
     .r_gate     (rf_gate     ),
     .r_pct      (rf_pct      ),
+    .r_lead_q4  (rf_lead_q4 ),
     .wr_pulse   (rf_wr_pulse )
 );
 
@@ -288,12 +304,20 @@ wire adapt_on = ADAPT_EN | rf_ctrl[0];
 wire med_on   = MED_EN   | rf_ctrl[1];
 wire aec_on   = AEC_EN   | rf_ctrl[2];
 wire osd_on_e = OSD_EN   | rf_ctrl[4];
+wire pred_on  = PRED_EN  | rf_ctrl[5];   // b5 = 速度预测使能
 
 wire [7:0] th_g  = reg_written ? rf_th_g  : th_g_kbd;
 wire [7:0] th_gr = adapt_on ? th_gr_auto : (reg_written ? rf_th_gr : th_gr_kbd);
 wire [7:0] th_gb = adapt_on ? th_gb_auto : (reg_written ? rf_th_gb : th_gb_kbd);
 
 assign disp_bin = disp_bin_k | rf_ctrl[3];
+
+//  宽松档面积门槛（UART 0x04）：写过寄存器就用寄存器值，否则用 parameter 默认
+assign min_area_lo_eff = reg_written ? {24'd0, rf_min_size} : MIN_AREA_LO_DEF;
+//  相对饱和度闸限（UART 0x03）：以前是死寄存器，现在真的接上了
+assign rel_sat_eff     = reg_written ? rf_rel_sat : REL_SAT_PCT;
+//  预测提前量（UART 0x0A）
+assign lead_q4_eff     = reg_written ? rf_lead_q4 : LEAD_Q4_DEF;
 
 //-------------------------------------------------------
 // (3) 中值预滤波（MED 关时纯直通，零延迟）
@@ -342,9 +366,8 @@ chroma_hist #(
 //-------------------------------------------------------
 // (5) 颜色分割：绝对判据 + 相对饱和度闸（抗反光）
 //-------------------------------------------------------
-color_seg #(
-    .REL_SAT_PCT (REL_SAT_PCT)
-) u_color_seg (
+color_seg u_color_seg (
+    .rel_sat_pct (rel_sat_eff),
     .rgb565 (pix_seg  ),
     .th_g   (th_g ),
     .th_gr  (th_gr),
@@ -424,6 +447,7 @@ blob_track #(
     .x          (x_v        ),
     .y          (y_cnt      ),
     .mask       (mask_d     ),
+    .min_area_lo (min_area_lo_eff),   // 宽松档：远 / 小目标也要认出来
     .aim_h_q8   (aim_h_eff   ),   // 运行时可变：UART 0x05 只覆盖低 8 位（小数）
     .bond_valid (raw_valid  ),
     .bond_l     (raw_l      ),
@@ -436,6 +460,7 @@ blob_track #(
     .aim_y      (raw_ay     ),
     .blob_area  (blob_area  ),
     .blob_cnt   (blob_cnt   ),
+    .blob_far   (raw_far    ),
     .cent_x     (cent_x     ),
     .cent_y     (cent_y     ),
     .fill_q8    (fill_q8    )
@@ -504,6 +529,36 @@ assign aim_x      = aim_x_r;
 assign aim_y      = aim_y_r;
 
 //-------------------------------------------------------
+// (9b) 速度预测（lead）：用最近几帧灯心外推「飞镖飞到时灯在哪」
+//   TRK_EN=0 时喂 raw_*（不加延迟，舵机跟踪要的就是快）；
+//   TRK_EN=1 时喂跟踪后的值（更稳，但慢 HIT_N 帧 -> 自己权衡）。
+//   pred_ok=0（历史不足 / 关闭）时输出直接镜像输入，等于不预测。
+//-------------------------------------------------------
+aim_predict #(
+    .AW     (AW    ),
+    .WIDTH  (IMG_W ),
+    .HEIGHT (IMG_H )
+) u_aim_predict (
+    .clk       (clk       ),
+    .rst_n     (rst_n     ),
+    .vsync     (vsync     ),
+    .en        (pred_on   ),
+    .raw_valid (TRK_EN ? trk_valid : raw_valid),
+    .cx        (TRK_EN ? trk_cx    : raw_cx   ),
+    .cy        (TRK_EN ? trk_cy    : raw_cy   ),
+    .bw        (bond_w    ),
+    .aim_h_q8  (aim_h_eff ),
+    .lead_q4   (lead_q4_eff),
+    .pcx       (pd_cx     ),
+    .pcy       (pd_cy     ),
+    .pay       (pd_ay     ),
+    .vx_q4     (pd_vx     ),
+    .vy_q4     (pd_vy     ),
+    .pred_ok   (pd_ok     ),
+    .moving    (pd_mov    )
+);
+
+//-------------------------------------------------------
 // (10) 叠印：红色圆环（套住灯）+ 瞄准点十字
 //-------------------------------------------------------
 overlay_box #(
@@ -522,7 +577,11 @@ overlay_box #(
     .cy    (center_y  ),
     .ax    (aim_x     ),
     .ay    (aim_y     ),
-    .draw  (draw      )
+    .pvx   (pd_cx     ),   // 预测瞄准点（黄色十字，只在目标在动时画）
+    .pvy   (pd_ay     ),
+    .pv_on (pd_mov    ),
+    .draw  (draw      ),
+    .draw_p(draw_p    )
 );
 
 //-------------------------------------------------------
@@ -560,7 +619,9 @@ wire [15:0] dim_pix = {1'b0, img_d[15:12],
 wire [15:0] disp_pix = disp_bin ? (mask_d ? 16'hFFFF : 16'h0000)
                                 : (mask_d ? img_d  : dim_pix);
 
-assign data_out = draw ? 16'hF800 : (osd_on ? osd_color : disp_pix);
+assign data_out = draw   ? 16'hF800 :               // 红色：圆环 + 当前几何瞄准十字
+                  draw_p ? 16'hFFE0 :               // 黄色：预测瞄准点（lead）
+                  osd_on ? osd_color : disp_pix;
 
 //-------------------------------------------------------
 // (13) 自动曝光闭环（P6，默认关闭）
@@ -608,6 +669,13 @@ result_frame #(
     .blob_cnt   (blob_cnt   ),
     .adapt_ok   (adapt_ok   ),
     .disp_bin   (disp_bin   ),
+    .pred_ok    (pd_ok      ),
+    .moving     (pd_mov     ),
+    .far_small  (raw_far    ),
+    .vx_q4      (pd_vx      ),
+    .vy_q4      (pd_vy      ),
+    .px         (pd_cx      ),
+    .py         (pd_cy      ),
     .txd        (uart_txd   )
 );
 
