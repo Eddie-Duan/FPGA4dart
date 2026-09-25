@@ -67,9 +67,10 @@ if {$top_now ne "ov5640_lcd"} {
 # ---- 4) 重建编译顺序（关键：不重建的话新文件可能不参与综合）----
 update_compile_order -fileset sources_1
 
-# ---- 5) 汇总，并逐一确认 11 个新模块都在 ----
+# ---- 5) 汇总，并逐一确认新增模块都在 ----
 set want {vision_stat.v blob_track.v track_ab.v chroma_hist.v median3x3.v \
-          uart_tx.v uart_rx.v result_frame.v reg_file.v aec_loop.v osd_text.v}
+          uart_tx.v uart_rx.v result_frame.v reg_file.v aec_loop.v osd_text.v \
+          aim_predict.v}
 set lack {}
 foreach w $want {
     if {[llength [get_files -quiet [file join $rtl $w]]] == 0} { lappend lack $w }
@@ -78,7 +79,7 @@ foreach w $want {
 set n [llength [get_files -of_objects [get_filesets sources_1]]]
 puts "== sources_1 现在共 $n 个文件"
 if {[llength $lack] == 0} {
-    puts "== 11 个新模块全部就位，可以 Run Synthesis 了。"
+    puts "== 新增模块全部就位，可以 Run Synthesis 了。"
 } else {
     puts "!! 仍然缺少：$lack"
 }

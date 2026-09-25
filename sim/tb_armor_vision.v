@@ -373,12 +373,47 @@ result_frame #(
     .vy_q4      (16'sd0    ),
     .px         (10'd440   ),
     .py         (10'd248   ),
+    //  P11 弹道字段：w=201 -> dist=70cm drop=22px（表值，见 tools/gen_ballistic_lut.py）
+    .dist_ok    (1'b1      ),
+    .dist_cm    (16'd505   ),
+    .drop_px    (16'd159   ),
+    .fx         (10'd408   ),
+    .fy         (10'd178   ),
     .txd        (rf_txd    )
+);
+
+//  ---- P11 弹道单测 ----
+//  宽度 -> 距离 / 下坠 / 最终瞄准点；表值由 tools/gen_ballistic_lut.py 算出
+reg         bl_vsync = 1'b0;
+reg  [10:0] bl_bw    = 11'd100;
+reg  [9:0]  bl_pcx   = 10'd300;
+reg  [9:0]  bl_pcy   = 10'd248;
+reg  [7:0]  bl_scale = 8'd255;      // 255 = x1.0（基准弹速 20m/s）
+wire [15:0] bl_d_cm, bl_d_px;
+wire [9:0]  bl_fx, bl_fy;
+wire        bl_ok_t;
+
+ballistic #(.AW(10), .WIDTH(800), .HEIGHT(480)) u_bal_test (
+    .clk        (clk      ),
+    .rst_n      (rst_n    ),
+    .vsync      (bl_vsync ),
+    .en         (1'b1     ),
+    .raw_valid  (1'b1     ),
+    .bw         (bl_bw    ),
+    .aim_h_q8   (16'd64   ),
+    .pcx        (bl_pcx   ),
+    .pcy        (bl_pcy   ),
+    .drop_scale (bl_scale ),
+    .dist_cm    (bl_d_cm  ),
+    .drop_px    (bl_d_px  ),
+    .fx         (bl_fx    ),
+    .fy         (bl_fy    ),
+    .dist_ok    (bl_ok_t  )
 );
 
 //  115200 @ 25MHz = 217 拍/位；起始位下降沿后等 1.5 位再每 217 拍采一次
 localparam integer UART_DIV = 217;
-reg  [7:0]  ur_b [0:23];
+reg  [7:0]  ur_b [0:33];
 reg  [5:0]  ur_n    = 6'd0;
 reg         ur_act  = 1'b0;
 reg         ur_done = 1'b0;
@@ -407,10 +442,10 @@ always @(posedge clk or negedge rst_n) begin
             ur_wait <= 16'd216;                    // 每 217 拍一位
         end
         else begin                                 // 停止位 -> 收完一个字节
-            if(ur_n < 6'd24) begin
+            if(ur_n < 6'd34) begin
                 ur_b[ur_n] <= ur_sh;
                 ur_n <= ur_n + 6'd1;
-                if(ur_n == 6'd23) ur_done <= 1'b1;  // 第一帧收满 24 字节就冻结
+                if(ur_n == 6'd33) ur_done <= 1'b1;  // 第一帧收满 34 字节就冻结
             end
             ur_act <= 1'b0;
         end
@@ -518,11 +553,12 @@ wire [4:0]  ta_lost ;
 
 track_ab #(
     .AW (10), .WIDTH(800), .HEIGHT(480),
-    .GATE (96), .HIT_N (2), .LOST_N (6)
+    .HIT_N (2), .LOST_N (6)
 ) u_track_test (
     .clk       (clk       ),
     .rst_n     (rst_n     ),
     .vsync     (ta_vsync  ),
+    .gate      (10'd96    ),   // 门控半径改成运行时端口了
     .raw_valid (ta_v_in   ),
     .raw_cx    (ta_cx_i   ),
     .raw_cy    (ta_cy_i   ),
@@ -566,6 +602,18 @@ task move_target;
             wait_frames(1);
             img_cx = img_cx + dx;
         end
+    end
+endtask
+
+//  给弹道单测打一拍 vsync（真实帧边界时序：下降沿后再等一拍才是 frame_end）
+task bl_frame;
+    begin
+        @(negedge clk);
+        bl_vsync = 1'b1;
+        repeat(4) @(posedge clk);
+        @(negedge clk);
+        bl_vsync = 1'b0;
+        repeat(4) @(posedge clk);
     end
 endtask
 
@@ -783,10 +831,10 @@ initial begin
     //=====================================================
     wait(ur_done);
     repeat(20) @(posedge clk);
-    chk("uart_nbytes", {26'd0, ur_n}, 32'd24);
+    chk("uart_nbytes", {26'd0, ur_n}, 32'd34);
     chk("uart_hdr0",   {24'd0, ur_b[0]},  32'hA5);
     chk("uart_hdr1",   {24'd0, ur_b[1]},  32'h5A);
-    chk("uart_flags",  {24'd0, ur_b[2]},  32'hB3);   // v2 标志 + pred/moving/adapt/valid
+    chk("uart_flags",  {24'd0, ur_b[2]},  32'hBB);   // 扩展帧+dist_ok+pred+moving+adapt+valid
     chk("uart_cx",     ({22'b0, ur_b[3]} << 8) | {24'd0, ur_b[4]}, 32'd408);
     chk("uart_cy",     ({22'b0, ur_b[5]} << 8) | {24'd0, ur_b[6]}, 32'd248);
     chk("uart_ay",     ({22'b0, ur_b[9]} << 8) | {24'd0, ur_b[10]}, 32'd198);
@@ -797,9 +845,47 @@ initial begin
     chk("uart_vy",     ({22'b0, ur_b[17]} << 8) | {24'd0, ur_b[18]}, 32'd0);
     chk("uart_px",     ({22'b0, ur_b[19]} << 8) | {24'd0, ur_b[20]}, 32'd440);
     chk("uart_py",     ({22'b0, ur_b[21]} << 8) | {24'd0, ur_b[22]}, 32'd248);
-    chk("uart_chk",    {24'd0, ur_chk_calc(1'b0)}, 32'h56);   // Python 独立算的期望值
+    //  P11 新增：距离 / 下坠 / 最终瞄准点
+    chk("uart_dist",   ({22'b0, ur_b[23]} << 8) | {24'd0, ur_b[24]}, 32'd505);
+    chk("uart_drop",   ({22'b0, ur_b[25]} << 8) | {24'd0, ur_b[26]}, 32'd159);
+    chk("uart_fx",     ({22'b0, ur_b[27]} << 8) | {24'd0, ur_b[28]}, 32'd408);
+    chk("uart_fy",     ({22'b0, ur_b[29]} << 8) | {24'd0, ur_b[30]}, 32'd178);
+    chk("uart_seq",    {24'd0, ur_b[31]}, 32'd0);     // 第一帧序号 = 0
+    chk("uart_crc",    ({22'b0, ur_b[32]} << 8) | {24'd0, ur_b[33]}, 32'h8B12);
+    //  CRC 期望值是 Python 独立算的（不是从收到的数据反推）
 
     //=====================================================
+    //=====================================================
+    $display("---- phase 13 : ballistic (distance + drop) unit test ----");
+    //=====================================================
+    //  宽度 100 -> 距离 141cm、下坠 45px；pcy=248 - (100*64/256=25) - 45 = 178
+    bl_bw = 11'd100;
+    bl_frame();
+    chk("bal_ok",      {31'b0, bl_ok_t}, 32'd1);
+    chk("bal_dist_w100", {16'd0, bl_d_cm}, 32'd141);
+    chk("bal_drop_w100", {16'd0, bl_d_px}, 32'd45);
+    chk("bal_fy_w100",   {22'd0, bl_fy},   32'd178);
+    chk("bal_fx_w100",   {22'd0, bl_fx},   32'd300);
+
+    //  宽度 201 -> 距离 70cm、下坠 22px；fy = 248 - 50 - 22 = 176
+    bl_bw = 11'd201;
+    bl_frame();
+    chk("bal_dist_w201", {16'd0, bl_d_cm}, 32'd70);
+    chk("bal_drop_w201", {16'd0, bl_d_px}, 32'd22);
+    chk("bal_fy_w201",   {22'd0, bl_fy},   32'd176);
+
+    //  弹速修正：写 163 (=25m/s, 164/256=0.64) -> 下坠 22*164/256 = 14
+    bl_scale = 8'd163;
+    bl_frame();
+    chk("bal_drop_v25",  {16'd0, bl_d_px}, 32'd14);
+    chk("bal_fy_v25",    {22'd0, bl_fy},   32'd184);
+    bl_scale = 8'd255;
+
+    //  主实例（灯宽 199~201）也要给出合理的距离/下坠：dist 69~72cm、drop 21~23px
+    chk("main_dist_ok", {31'b0, u_armor_vision.bl_ok}, 32'd1);
+    chk_range("main_dist", u_armor_vision.bl_dist_cm, 32'd69, 32'd72);
+    chk_range("main_drop", u_armor_vision.bl_drop_px, 32'd21, 32'd23);
+
     if(err_cnt == 32'd0)
         $display("==== ALL CHECKS PASSED ====");
     else

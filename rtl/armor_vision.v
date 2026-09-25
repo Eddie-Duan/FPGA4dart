@@ -73,6 +73,8 @@ module armor_vision #(
     parameter MIN_AREA_LO_DEF = 32'd8  ,   // 宽松档最小面积：远 / 小绿灯也算目标（0 = 关闭）
     parameter PRED_EN         = 1'b1   ,   // 速度预测（lead）总开关
     parameter [7:0] LEAD_Q4_DEF = 8'd64,   // 提前量：帧数 x16（64 = 4.0 帧，30fps 约 133ms）
+    parameter DIST_EN         = 1'b1  ,   // 弹道补偿（距离 + 下坠）总开关
+    parameter [7:0] DROP_SCALE_DEF = 8'd255,   // Q8 弹速修正：255 = 基准 20m/s
     //  ---- P4：时序跟踪 ----
     parameter TRK_EN      = 1'b0       ,   // 默认关（保持原有逐帧行为）
     parameter GATE        = 96         ,   // 门控半径（像素）
@@ -168,6 +170,7 @@ wire          adapt_ok;
 wire [7:0]    rf_th_g, rf_th_gr, rf_th_gb, rf_rel_sat, rf_min_size;
 wire [7:0]    rf_aim_h, rf_ring_t, rf_ctrl, rf_gate, rf_pct;
 wire [7:0]    rf_lead_q4 ;
+wire [7:0]    rf_drop_sc ;   // 0x0B 弹速修正
 wire          rf_wr_pulse;
 wire [7:0]    rx_data;
 wire          rx_done;
@@ -195,9 +198,18 @@ wire [7:0]    rel_sat_eff    ;   // 相对饱和度闸限（运行时）
 wire [7:0]    lead_q4_eff    ;   // 预测提前量（运行时）
 wire          raw_far        ;   // 命中的是宽松档（小 / 远目标）
 wire [AW-1:0] pd_cx, pd_cy, pd_ay;   // 预测灯心 / 预测瞄准点 y
-wire signed [15:0] pd_vx, pd_vy   ;  // 速度估计 Q4
+(* mark_debug = "true" *) wire signed [15:0] pd_vx, pd_vy;  // 速度估计 Q4
 wire          pd_ok, pd_mov   ;   // 预测有效 / 目标在动
 wire          draw_p          ;   // 预测十字（黄色）
+
+//  ---- P11 弹道补偿（新增）----
+(* mark_debug = "true" *) wire [15:0] bl_dist_cm, bl_drop_px;  // 距离 / 下坠
+(* mark_debug = "true" *) wire [AW-1:0] bl_fx, bl_fy;   // 最终瞄准点（ILA 重点）
+wire          bl_ok          ;   // 距离有效
+wire [AW-1:0] ring_t_eff     ;   // 0x06（必须和端口同宽，否则高位悬空成 z）
+wire [AW-1:0] gate_eff       ;   // 0x08（同上）
+wire [7:0]    pct_eff        ;   // 0x09
+wire [7:0]    drop_sc_eff    ;   // 0x0B
 
 //*****************************************************
 //**                    main code
@@ -290,6 +302,7 @@ reg_file u_reg_file (
     .r_gate     (rf_gate     ),
     .r_pct      (rf_pct      ),
     .r_lead_q4  (rf_lead_q4 ),
+    .r_drop_sc  (rf_drop_sc ),
     .wr_pulse   (rf_wr_pulse )
 );
 
@@ -305,6 +318,7 @@ wire med_on   = MED_EN   | rf_ctrl[1];
 wire aec_on   = AEC_EN   | rf_ctrl[2];
 wire osd_on_e = OSD_EN   | rf_ctrl[4];
 wire pred_on  = PRED_EN  | rf_ctrl[5];   // b5 = 速度预测使能
+wire dist_on  = DIST_EN  | rf_ctrl[6];   // b6 = 弹道补偿使能
 
 wire [7:0] th_g  = reg_written ? rf_th_g  : th_g_kbd;
 wire [7:0] th_gr = adapt_on ? th_gr_auto : (reg_written ? rf_th_gr : th_gr_kbd);
@@ -318,6 +332,11 @@ assign min_area_lo_eff = reg_written ? {24'd0, rf_min_size} : MIN_AREA_LO_DEF;
 assign rel_sat_eff     = reg_written ? rf_rel_sat : REL_SAT_PCT;
 //  预测提前量（UART 0x0A）
 assign lead_q4_eff     = reg_written ? rf_lead_q4 : LEAD_Q4_DEF;
+//  下面三条就是以前「文档写了、代码没接」的死寄存器（0x06/0x08/0x09），现在真接上了
+assign ring_t_eff  = reg_written ? {{(AW-8){1'b0}}, rf_ring_t} : RING_T[AW-1:0];
+assign gate_eff    = reg_written ? {{(AW-8){1'b0}}, rf_gate}   : GATE[AW-1:0];
+assign pct_eff     = reg_written ? rf_pct    : ADAPT_PCT[7:0];
+assign drop_sc_eff = reg_written ? rf_drop_sc : DROP_SCALE_DEF;
 
 //-------------------------------------------------------
 // (3) 中值预滤波（MED 关时纯直通，零延迟）
@@ -342,7 +361,6 @@ assign pix_seg = med_on ? med_pix : data_v;
 // (4) 自适应阈值：色度直方图
 //-------------------------------------------------------
 chroma_hist #(
-    .PCT       (ADAPT_PCT),
     .MIN_TOTAL (2000     )
 ) u_chroma_hist (
     .clk       (clk        ),
@@ -352,6 +370,7 @@ chroma_hist #(
     .r8        ({pix_seg[15:11], 3'b0}),
     .g8        ({pix_seg[10:5],  2'b0}),
     .b8        ({pix_seg[4:0],   3'b0}),
+    .pct       (pct_eff    ),
     .en        (adapt_on   ),
     .th_gr_man (reg_written ? rf_th_gr : th_gr_kbd),
     .th_gb_man (reg_written ? rf_th_gb : th_gb_kbd),
@@ -474,13 +493,13 @@ track_ab #(
     .AW     (AW    ),
     .WIDTH  (IMG_W ),
     .HEIGHT (IMG_H ),
-    .GATE   (GATE  ),
     .HIT_N  (HIT_N ),
     .LOST_N (LOST_N)
 ) u_track_ab (
     .clk       (clk       ),
     .rst_n     (rst_n     ),
     .vsync     (vsync     ),
+    .gate      (gate_eff  ),
     .raw_valid (TRK_EN ? raw_valid : 1'b0),
     .raw_cx    (raw_cx    ),
     .raw_cy    (raw_cy    ),
@@ -559,11 +578,37 @@ aim_predict #(
 );
 
 //-------------------------------------------------------
+// (9c) 弹道补偿（P11）：距离反推 + 下坠补偿 -> 最终建议瞄准点 fx/fy
+//   两张 1/w 查表搞定（推导见 rtl/ballistic.v 顶部），零除法、时序零风险。
+//   弹速不同就写 UART 0x0B 的 DROP_SCALE，不用重新综合。
+//-------------------------------------------------------
+ballistic #(
+    .AW     (AW    ),
+    .WIDTH  (IMG_W ),
+    .HEIGHT (IMG_H )
+) u_ballistic (
+    .clk        (clk        ),
+    .rst_n      (rst_n      ),
+    .vsync      (vsync      ),
+    .en         (dist_on    ),
+    .raw_valid  (raw_valid  ),
+    .bw         (bond_w     ),
+    .aim_h_q8   (aim_h_eff  ),
+    .pcx        (pd_cx      ),
+    .pcy        (pd_cy      ),
+    .drop_scale (drop_sc_eff),
+    .dist_cm    (bl_dist_cm ),
+    .drop_px    (bl_drop_px ),
+    .fx         (bl_fx      ),
+    .fy         (bl_fy      ),
+    .dist_ok    (bl_ok      )
+);
+
+//-------------------------------------------------------
 // (10) 叠印：红色圆环（套住灯）+ 瞄准点十字
 //-------------------------------------------------------
 overlay_box #(
     .AW      (AW     ),
-    .RING_T  (RING_T ),
     .CROSS_L (CROSS_L)
 ) u_overlay_box (
     .valid (bond_valid),
@@ -577,8 +622,9 @@ overlay_box #(
     .cy    (center_y  ),
     .ax    (aim_x     ),
     .ay    (aim_y     ),
-    .pvx   (pd_cx     ),   // 预测瞄准点（黄色十字，只在目标在动时画）
-    .pvy   (pd_ay     ),
+    .pvx   (bl_fx     ),   // 最终瞄准点（黄色十字，只在目标在动时画）
+    .pvy   (bl_fy     ),   //   = 预测灯心 + 几何偏移 + 下坠补偿
+    .ring_t(ring_t_eff),   // 注意：ring_t_eff 是 AW 位（窄了高位会悬空）
     .pv_on (pd_mov    ),
     .draw  (draw      ),
     .draw_p(draw_p    )
@@ -676,6 +722,11 @@ result_frame #(
     .vy_q4      (pd_vy      ),
     .px         (pd_cx      ),
     .py         (pd_cy      ),
+    .dist_ok    (bl_ok      ),
+    .dist_cm    (bl_dist_cm ),
+    .drop_px    (bl_drop_px ),
+    .fx         (bl_fx      ),
+    .fy         (bl_fy      ),
     .txd        (uart_txd   )
 );
 

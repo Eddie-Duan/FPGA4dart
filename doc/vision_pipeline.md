@@ -33,6 +33,7 @@
 | `blob_track.v` | `blob_track` | **連通團塊跟蹤**（P3，取代 `proj_bond`）：行程編碼 + 4 個團塊記錄 → 外框 / 面積 / 形心 / 填充率 / 數量。**P9**：兩級面積門檻（嚴檔 `MIN_AREA` / 寬鬆檔 `min_area_lo`，後者附長寬比 + 填充率合理性檢查） |
 | `track_ab.v` | `track_ab` | **時序門控 + α-β 跟蹤**（P4）：門控半徑 + 連續命中/丟失計數 + 位置平滑與速度外推 |
 | `aim_predict.v` | `aim_predict` | **速度預測 / 提前量**（P10）：α-β 速度估計（Q4）+ 外推 `LEAD_Q4` 幀 → 預測燈心 / 預測瞄準點；`pred_ok=0` 時鏡像輸入 |
+| `ballistic.v` | `ballistic` | **距離 + 彈道下墜補償**（P11）：兩張 1/w 表（`dist_cm = 14135/w`、`drop_px = 4454.5/w`）→ `fx/fy` 最終瞄準點；表由 `tools/gen_ballistic_lut.py` 生成 |
 | `chroma_hist.v` | `chroma_hist` | **自適應閾值**（P5）：G-R / G-B 各 256 bin 直方圖，幀末取分位數當閾值 |
 | `aec_loop.v` | `aec_loop` | **自動曝光閉環**（P6）：統計過曝像素比例，據此微調 0x3501；預設關閉，關時不產生任何 I2C 請求 |
 | `uart_tx.v` / `uart_rx.v` | — | UART 8N1 物理層（P1/P2），純 RTL，不用 Xilinx IP |
@@ -58,6 +59,16 @@
 | `patch_far_predict_fix.py` | 修 xvlog 的「重複宣告 / 先用後宣告」（`bond_w` 必須先宣告再例化 `aim_predict`） |
 | `patch_far_predict_tb.py` | 測試台新增相位 10/11/12（遠/小目標、速度預測、UART v2 逐位元組核對 + 115200 接收監視器） |
 | `patch_far_predict_tb2.py` | 修測試台的兩處編譯錯（字面量筆誤、`function` 缺 input） |
+| `patch_blob_timing.py` | **修 50MHz 下的 setup 違例**：把 `blob_track` 的選塊/幾何換算拆成三級流水（資料幀內準靜態，拆開對功能零影響） |
+| `timing_peek.py` | 從 `timing_summary_routed.rpt` 裡抽出「哪個時鐘域 / 哪條路徑 / 邏輯還是佈線喫緊」 |
+| `timing_peek.tcl` | 在 **routed checkpoint** 上列出**所有 slack < 1ns** 的路徑（summary 只給最差 10 條，不夠用） |
+| `patch_p11_ports.py` | **P11**：把 `RING_T`/`GATE`/`ADAPT_PCT` 三個 parameter 改成運行時輸入端口 |
+| `patch_p11_av.py` | **P11**：`armor_vision` 接線（例化 `ballistic`、接上三個運行時端口、`reg_file` 新增 `0x0B`） |
+| `patch_p11_tb.py` / `patch_p11_build.py` / `patch_p11_fix*.py` | **P11** 的測試台、構建腳本與兩處修錯（重複聲明 / **端口位寬懸空**） |
+| `gen_ballistic_lut.py` | **生成** `rtl/ballistic.v`（1/w 表）；改公式 / 焦距 / 彈速基準就重跑它 |
+| `patch_result_frame_v3.py` | 上報幀 16 → **34 字節**（+距離/下墜/最終瞄準點/序號/CRC16） |
+| `tb_probe.v`（在 `sim/`） | **快速探針**：只跑 5 幀，在固定像素把顯示通路各級與**實例內部端口**打出來（20 秒定位 X 擴散） |
+| `synth_check_vision.tcl` | 對 `armor_vision` 做 OOC 綜合（**無時序約束**，只能看資源與 latch，時序要看 implementation） |
 | `patch_camera_lock.py` | 加入**可選**的相機固定曝光 / 增益（6 條寄存器；**預設 `CAM_LOCK_EN = 1'b0` 不啟用**，保持原廠自動曝光）。**完全不碰 AWB**，並會自動清掉早期寫壞 AWB 的版本 |
 | `patch_project.py` | 把視覺管線接進乾淨的官方 39 例程（已套用過） |
 | `add_source.py` | 新增 `rtl/*.v` 的一鍵上戶口：UTF-8 → GBK（回讀比對）+ 註冊進 `.xpr`。轉碼部分可靠；**`.xpr` 那半只能在 Vivado 關著時用** |
@@ -912,6 +923,179 @@ P0 階段這些統計量還沒有下游消費者（UART 在 P1 才接），所�
 `dont_touch` 把實例釘住，否則綜合器會整塊優化掉、`mark_debug` 抓不到東西；P1 之後可以拿掉。
 
 從紅藍版升級到綠色版：`python tools/patch_green.py`（可重複執行，已套用過）。
+
+## 20. 彈道補償（P11）：由表觀寬度反推距離與下墜
+
+### 需求
+
+飛鏢飛行過程中會下墜（5m、彈速 20m/s 時 t=0.25s，自由落體已經 30cm），
+所以「瞄準點」不等於「燈心 + 幾何偏移」，還要再抬一個下墜量。
+PL 沒有測距儀，唯一可用的距離線索是**表觀寬度 w**。
+
+### 推導：兩件事都只是 1/w
+
+相機焦距（像素）`f_px = 2570`（第 13 節推過）、靶標燈直徑 `D = 55mm`：
+
+```
+dist_mm = f_px * D / w = 141350 / w        ->  dist_cm = 14135 / w
+```
+
+下墜是世界座標的量，但要補在【像素】上：
+
+```
+dist_m    = dist_cm / 100
+t         = dist_m / v0                 (v0 = 彈速)
+drop_m    = g*t^2/2
+px_per_mm = w / D                     <- 這一項也含 w
+drop_px   = drop_m * 1000 * px_per_mm
+```
+
+把 `dist_m ∝ 1/w` 代進去，w 只剩一次冪：
+
+```
+drop_px = 4454.5 / w                  (v0 = 20 m/s)
+```
+
+**所以兩張 256 項的表都只是 1/w** —— 零除法、零乘法、時序零風險。
+
+換彈速也不用重新綜合：寫 UART `0x0B` 的 `DROP_SCALE`（Q8，255 = 20m/s）：
+
+```
+DROP_SCALE = round(256*(20/v0)^2) - 1
+20m/s -> 255     25m/s -> 163     30m/s -> 113     15m/s -> 454
+```
+
+### 實現
+
+`rtl/ballistic.v`（兩張表由 `tools/gen_ballistic_lut.py` 生成，改公式就重跑那個腳本）：
+
+```
+dist_cm = ROM_DIST[bw]                                (bw > 255 飽和；bw < 8 視為無效)
+drop_px = (ROM_DROP[bw] * (DROP_SCALE+1)) >> 8
+fx      = 預測燈心 x
+fy      = 預測燈心 y - (w*AIM_H_Q8/256) - drop_px     (單調飽和，減不夠就取 0)
+```
+
+`dist_ok` = 有目標且寬度在表內（`bw >= 8`），上報在 flags.b3。
+
+### 與速度預測的關係
+
+`aim_predict`（提前量）與 `ballistic`（下墜）是兩個獨立的修正，串在一起：
+
+```
+預測燈心 -> 幾何偏移（打擊點在燈上方）-> 下墜補償 -> fx / fy
+```
+
+**雲台直接用 `fx/fy`**，不用自己重算。中間量（cx/cy、px/py、dist_cm、drop_px）也全都上報，便於調試。
+
+### 校準
+
+1. `f_px` / `D` 寫在 `tools/gen_ballistic_lut.py` 頭部 —— 改完重跑腳本 + 重新綜合；
+2. 彈速用 UART `0x0B` 在線調（**不用重新綜合**），打幾發看落點偏移再微調；
+3. 想知道 `f_px` 到底是多少：把燈放在已知距離，讀數碼管/OSD 上的寬度，
+   `f_px = w * dist_mm / 55`。
+
+---
+
+## 21. 上報協議 v3 與“死寄存器”清賬（P11）
+
+上報幀从 16 字節（v1）升到 **34 字節（v3）**：新增速度、預測燈心、距離、下墜、
+最終瞄準點、**幀序號**，並把單字節異或換成 **CRC-16/CCITT-FALSE**。
+幀序號讓接收端能發現丟幀（雲台指令链路必須知道）。CRC 逐位串行（240 拍）實現，
+不做 256 級組合異或 —— 一幀 30ms 內算完，對時序零影響。詳見第 17 節。
+
+同時把 `reg_file` 里一直「文檔寫了、代碼沒接」的地址真的接上了：
+
+| 地址 | 以前 | 現在 |
+|---|---|---|
+| `0x03` REL_SAT_PCT | 死寄存器 | -> `color_seg` 的 `rel_sat_pct` 輸入 |
+| `0x04` MIN_SIZE | 死寄存器（語意模糊） | -> `blob_track` 的 `min_area_lo`（寬鬆檔面積） |
+| `0x06` RING_T | 死寄存器 | -> `overlay_box` 的 `ring_t`（參數->端口） |
+| `0x08` GATE | 死寄存器 | -> `track_ab` 的 `gate`（參數->端口） |
+| `0x09` ADAPT_PCT | 死寄存器 | -> `chroma_hist` 的 `pct`（參數->端口） |
+| `0x0B` DROP_SCALE | 不存在 | 新增：彈速修正（Q8） |
+
+至此 P2 的「運行時改參數、免重新綜合」才算真的成立。
+
+> 一路踩到的同一個坑：「文檔寫了、代碼沒接」——`0x05 rf_aim_h`（舊）、
+> `0x03/0x04`（P9 修）、`0x06/0x08/0x09`（P11 修）。
+> **自查法**：全局搜 `rf_xxx`，只出現「聲明 + 例化連線」2 次的就是死的。
+
+---
+
+## 19. 時序：50MHz 下的 setup 違例與三級流水
+
+### 現象
+
+P9（兩級面積門檻）之後跑 implementation：
+
+```
+[Timing 38-282] The design failed to meet the timing requirements.
+   WNS -5.242 ns   TNS -48.373 ns   Failing Endpoints 10 / 46587
+```
+
+### 定位（兩個小工具）
+
+```
+python tools/timing_peek.py          # 讀 impl_1 的 timing_summary_routed.rpt，抽重點
+vivado -mode batch -source tools/timing_peek.tcl -nojournal
+                                     # 直接在 routed checkpoint 上列【所有 slack < 1ns】的路徑
+```
+
+`timing_peek.tcl` 是關鍵：summary 報告只有「最差的 10 條」，修完一條後下一條如果只是
+`-0.1ns` 就要再等十幾分鐘重跑實現。一次把所有逼近極限的路徑列出來，才能一輪修完。
+
+結果非常乾淨：
+
+| 路徑 | slack |
+|---|---|
+| `u_blob_track/r_l_reg[0][6]/C` → `u_blob_track/aim_y_reg[9:0]/D`（10 位 = 10 個端點） | **-5.242 ns** |
+| 其餘全部（含 MIG / DDR3 / LCD / 相機路徑） | ≥ **+0.98 ns** |
+
+時鐘是 `clk_out2_clk_wiz_0`（**50 MHz，20 ns**），不是像素時鐘的 25 MHz —— 這條管線的
+時序預算只有 20 ns，不是 40 ns。
+
+### 根因
+
+P9 把形狀合理性檢查（4 個候選各一個 `w*h` 乘法 + 長寬比/填充率比較 + 兩級優先樹）
+塞進了原本「選塊 → 幾何換算（`bw × AIM_H_Q8` → 飽和減法 → `aim_y`）」的**同一條**組合鏈：
+
+```
+r_l_reg[0] ─┐
+            ├─ 4×(w*h 乘法 + 比較 + 優先樹) → best_i → mux → bw_w → ×372/256 → 飽和減法 → aim_y_reg
+r_area      ─┘                              25.160ns（logic 14.313 + route 10.847）
+```
+
+模擬看不出來（`synth_check_vision.tcl` 是 **out-of-context 綜合，沒有任何時序約束**），
+只有 implementation 才報。
+
+### 修法：三級流水（`tools/patch_blob_timing.py`）
+
+```
+級 0（組合）  形狀合理性：4 個候選並行 w*h + 比較            → shp_now
+級 1（寄存器）shp_ok_r      <- shp_now      ← 乘法移出選塊路徑
+級 2（寄存器）best_i_r / best_any_r / best_far_r / cnt_r   <- 選塊結果
+級 3（寄存器）sl_r/sr_r/st_r/sb_r + sa_r/sx_r/sy_r + sany_r/sfar_r/scnt_r
+級 3 之後（組合）cx_w / cy_w / bw_w / up_t / ay_s → 在 vsync 下降沿採樣
+```
+
+**為什麼加幾拍完全不會改變行為**（這是不動邏輯就能修時序的關鍵）：
+
+- 團塊記錄只在一幀裡 `emit` 時才改變，而結果只在 **vsync 下降沿**取用 —— 中間隔著幾百拍；
+- 記錄清空同樣發生在 vsync 下降沿那一拍，而輸出端讀的是**清空之前**就已經打進流水線的值
+  （nonblocking 語義下，同一拍的 `<=` 讀到的是該拍之前的狀態）；
+- 所以只要「最後一次 emit → vsync 下降沿」≥ 流水級數（3 拍），時序上是等價的。
+
+實測：**90 項自檢逐項不變**（`ALL CHECKS PASSED`），包含遠/小目標、速度預測、UART v2。
+
+### 教訓
+
+- 這種「一幀內準靜態」的資料（團塊記錄、選塊結果、幾何參數）**可以隨便打拍**，
+  代價只是一次性的幾十個 FF —— 這是純 RTL 設計裡最便宜的時序修法；
+- 相對地，**逐像素**的資料流（行緩衝、形態學、投影）不能亂加拍，那要算好對齊；
+- 新增邏輯後要盯住「這一條組合鏈有多長」，`w*h` 這種乘法尤其危險；
+- OOC 綜合綠燈 ≠ 時序收斂，兩件事都要跑。
+
 
 ## 18. 兩個「仿真過、實現掛」的坑（多驅動網路）
 

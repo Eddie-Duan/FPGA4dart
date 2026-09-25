@@ -16,20 +16,16 @@ v1（旧）帧格式（定长 16 字节，115200 8N1）：
     14 blob_cnt                   本帧合格团块数
     15 checksum                   byte2..byte14 逐字节异或
 
-v2（当前，24 字节）：前 15 个字节含义与 v1 完全一致 +
-    2  flags                     b7=1 表示 v2 帧
-                                 b6=far_small（命中的是「小而远」的宽松档）
-                                 b5=moving（目标在动） b4=pred_ok（预测有效）
-                                 b3=保留
-    15 vx_hi  16 vx_lo           速度估计 x（Q4，有符号，1 px/帧 = 16）
-    17 vy_hi  18 vy_lo           速度估计 y（Q4，有符号）
-    19 px_hi  20 px_lo           预测灯心 x（LEAD 帧之后）
-    21 py_hi  22 py_lo           预测灯心 y
-    23 checksum                   byte2..byte22 逐字节异或
-
-  预测瞄准点 = (px, py - w * AIM_H_Q8 / 256)：云台 / 飞控要打提前量就指向它；
-  v1 的 ax/ay 仍然是「当前帧的几何瞄准点」（不改语义，旧的接收端照用）。
-  v2 帧的 flags.b7=1，所以拿 v1 逻辑算校验必然对不上 -> 旧解析器会安全丢弃。
+v3（当前，34 字节）：前 15 个字节含义与 v1 一致，flags.b7=1 表示扩展帧
+    2  flags   b7=1(扩展) b6=far_small b5=moving b4=pred_ok b3=dist_ok
+               b2=二值显示 b1=adapt_ok b0=valid
+   15-16 vx_q4   17-18 vy_q4     速度估计（Q4 有符号，16 = 1 px/帧）
+   19-20 px      21-22 py        预测灯心（LEAD 帧之后）
+   23-24 dist_cm                距离（cm，由表观宽度反推；dist_ok=0 时无意义）
+   25-26 drop_px                弹道下坠补偿（像素）
+   27-28 fx      29-30 fy        **最终建议瞄准点（云台直接用这个）**
+   31    seq                    帧序号（每帧 +1，回绕；可据此发现丢帧）
+   32-33 crc16                  CRC-16/CCITT-FALSE（poly 0x1021、初值 0xFFFF、MSB 先）
 
 用法：
     # 0) 先看看有哪些串口可用（拿这个当依据，别直接猜 COM 号）
@@ -52,14 +48,14 @@ import sys
 import time
 
 HDR0, HDR1 = 0xA5, 0x5A
-FRAME_LEN = 16        # v1
-FRAME_LEN_V2 = 24     # v2（flags.b7 = 1）
+FRAME_LEN    = 16     # v1（旧格式，flags.b7 = 0）
+FRAME_LEN_V3 = 34     # v3（扩展帧，flags.b7 = 1）
 
 
 def frame_len(buf):
     """根据 flags 的 b7 判断这帧有多长（buf 至少 3 字节）"""
     if len(buf) >= 3 and (buf[2] & 0x80):
-        return FRAME_LEN_V2
+        return FRAME_LEN_V3
     return FRAME_LEN
 
 
@@ -69,30 +65,39 @@ def _i16(hi, lo):
     return v - 0x10000 if v & 0x8000 else v
 
 
+def crc16_ccitt(data):
+    """CRC-16/CCITT-FALSE：poly 0x1021、初值 0xFFFF、MSB 先（和 RTL 一致）"""
+    crc = 0xFFFF
+    for byte in data:
+        for i in range(8):
+            msb = (crc >> 15) ^ ((byte >> (7 - i)) & 1)
+            crc = (crc << 1) & 0xFFFF
+            if msb:
+                crc ^= 0x1021
+    return crc
+
+
 def decode_frame(f):
-    """f: 16 或 24 字节的 list/bytes。返回 dict；帧头或校验不对返回 None。"""
-    if len(f) == FRAME_LEN_V2:
+    """f: 16 或 34 字节的 list/bytes。返回 dict；帧头或校验不对返回 None。"""
+    if len(f) == FRAME_LEN_V3:
         if f[0] != HDR0 or f[1] != HDR1 or not (f[2] & 0x80):
             return None
-        chk = 0
-        for i in range(2, 23):
-            chk ^= f[i]
-        if chk != f[23]:
+        if crc16_ccitt(bytes(f[2:32])) != ((f[32] << 8) | f[33]):
             return None
         flags = f[2]
-        cx = (f[3] << 8) | f[4]
-        cy = (f[5] << 8) | f[6]
-        ax = (f[7] << 8) | f[8]
-        ay = (f[9] << 8) | f[10]
         return {
-            'ver': 2,
+            'ver': 3,
             'valid':    bool(flags & 0x01),
             'adapt_ok': bool(flags & 0x02),
             'disp_bin': bool(flags & 0x04),
+            'dist_ok':  bool(flags & 0x08),
             'pred_ok':  bool(flags & 0x10),
             'moving':   bool(flags & 0x20),
             'far':      bool(flags & 0x40),
-            'cx': cx, 'cy': cy, 'ax': ax, 'ay': ay,
+            'cx': (f[3] << 8) | f[4],
+            'cy': (f[5] << 8) | f[6],
+            'ax': (f[7] << 8) | f[8],
+            'ay': (f[9] << 8) | f[10],
             'w': f[11],
             'area': f[12] * 128,
             'fill_q8': f[13],
@@ -101,6 +106,11 @@ def decode_frame(f):
             'vy_q4': _i16(f[17], f[18]),
             'px': (f[19] << 8) | f[20],
             'py': (f[21] << 8) | f[22],
+            'dist_cm': (f[23] << 8) | f[24],
+            'drop_px': (f[25] << 8) | f[26],
+            'fx': (f[27] << 8) | f[28],
+            'fy': (f[29] << 8) | f[30],
+            'seq': f[31],
         }
 
     if len(f) != FRAME_LEN:
@@ -145,6 +155,11 @@ def fmt(d):
                     'M' if d['moving'] else ' ', d['px'], d['py']))
         if d['far']:
             base += ' [远/小]'
+    if d.get('ver', 1) >= 3:
+        base += (' | 距离=%4dcm 下坠=%3dpx %s 最终瞄准=(%3d,%3d) seq=%d'
+                 % (d['dist_cm'], d['drop_px'],
+                    'OK' if d['dist_ok'] else '--',
+                    d['fx'], d['fy'], d['seq']))
     return base
 
 

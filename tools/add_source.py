@@ -142,6 +142,14 @@ def main():
 
     register([os.path.basename(n) for n in names])
     print('done.')
+    print('')
+    print('*** 注意：以上 .xpr 注册只在 Vivado 关着的时候有效 ***')
+    print('    如果工程正在 Vivado 里开着，任何一次保存都会用内存里的文件列表')
+    print('    覆盖磁盘上的 .xpr，这次注册会被静默抹掉 -> 综合报')
+    print('    [Synth 8-439] module xxx not found（仿真却过得去，很难查）。')
+    print('    正解：在 Vivado 的 Tcl Console 里执行')
+    print('        source {%s}' % os.path.join(HERE, 'add_sources_vivado.tcl').replace('\\', '/'))
+    print('    或 GUI：右键 sources_1 -> Add Sources -> Add Files。')
 
 
 if __name__ == '__main__':

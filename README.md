@@ -33,6 +33,7 @@ OV5640 (RGB565 800×480) → DDR3 ping-pong buffer → [ green seg → morpholog
 | **Tool** | Vivado 2020.2 |
 | **Verification** | `xsim` self-checking testbench — **90 checks, `ALL CHECKS PASSED`** (28 added in this round: far/small target, velocity-lead prediction, UART v2 frame) |
 | **Synthesis** | 0 errors / 0 warnings / 0 latches (after P9/P10) — LUT 7326 (35.2%), FF 2838 (6.8%), LUTRAM 2608, DSP 21, BRAM 0 |
+| **Timing** | `clk_out2` (50 MHz) is the tight domain; the P9 blob-selection chain missed it by 5.2 ns and is now split into a 3-stage pipeline (frame-static data) — see doc §19 |
 | **Reference** | color test from the dart2026 open-source FPGA IP (`Threshold.v`); fixed-exposure approach from its `hikrobot.cpp` |
 | **License** | MIT (see [LICENSE](LICENSE)) |
 
@@ -94,10 +95,11 @@ LEDs: `led[0..2]` which threshold is selected · `led[3]` target detected (solid
 | **时序跟踪**（P4） | `track_ab`：门控（新观测必须落在预测位置 ±`GATE` 像素内，别处的绿块直接被拒）+ 持久性（连续 `HIT_N` 帧命中才报有效、连续 `LOST_N` 帧丢失才撤销）+ α-β 滤波（平滑位置 + 速度外推，短时丢帧不跳变）。**dart 的 PL 没有这一层** |
 | **远处小灯也认**（P9） | `blob_track` 改成**两级面积门槛**：严档 400 像素（近/大目标）优先；没有严档时，只要面积 ≥ `min_area_lo`（默认 **8**，UART `0x04` 运行时可调）且长宽比 ≤ 8:1、填充率 ≥ 1/4 就接受。**修复「绿灯拉远后屏幕上有高亮却识别不到目标」**；`min_area_lo = 0` 可一键回到旧行为 |
 | **速度预测 / 提前量**（P10） | `aim_predict`：用最近几帧灯心做 α-β 速度估计（Q4，px/帧），外推 `LEAD_Q4` 帧（默认 4.0 帧 ≈ 133ms@30fps，UART `0x0A` 可调）→ 输出**预测灯心**，直接给云台打提前量。走 `raw_*` 路径**不加延迟**；静止目标下与不预测逐位一致。LCD 上黄色十字 = 预测瞄准点（只在目标在动时画） |
+| **距离 + 弹道下坠**（P11） | `ballistic`：由表观宽度反推距离与下坠（推导后**两者都只是 1/w**，两张 256 项表搞定，零除法/零乘法）。输出 `dist_cm` / `drop_px` / **最终瞄准点 `fx,fy`**（预测灯心 + 几何偏移 + 下坠补偿）——**云台直接用它**。弹速不用重新综合：UART `0x0B` 写 DROP_SCALE |
 | **自适应阈值**（P5） | `chroma_hist`：每帧统计 `G-R` / `G-B` 的 256 bin 直方图，帧末取分位数当阈值（默认「色度最高的 15% 像素」），阈值自动跟着距离 / 光照走。**dart 也没有这个**（它靠 PS 写寄存器） |
 | **曝光闭环**（P6） | `aec_loop`：统计过曝（三通道同时 >200）像素比例，超上限就降曝光、低于下限就升曝光，带死区与速率限制。**这是对「手猜曝光导致黑屏」的正确修复**；默认关闭 |
 | **中值预滤波**（P7） | `median3x3`：分离式 3×3 中值，二值化前压强噪声。默认关闭（关闭时零延迟） |
-| **UART 接口**（P1/P2） | `result_frame` 定长上报（**v2 = 24 字节**：v1 的 15 字节含义不变，新增速度 `vx/vy`（Q4）与**预测灯心** `px/py`，`flags.b7=1` 标记 v2 → 旧解析器会安全丢弃）；`reg_file` 用 `0xAA addr data (addr^data)` 运行时写参数，**不用重新综合** |
+| **UART 接口**（P1/P2/P11） | `result_frame` 定长上报（**v3 = 34 字节**：新增速度、预测灯心、距离、下坠、**最终瞄准点 fx/fy**、帧序号，并把异或换成 **CRC-16**）；`reg_file` 用 `0xAA addr data (addr^data)` 运行时写参数（`0x03/0x04/0x06/0x08/0x09/0x0A/0x0B` 全部真接上了），**不用重新综合** |
 | **仪表盘**（P0） | `vision_stat`：帧率 / 帧周期 / 帧行数 / 掩码像素数 / 命中率，纯观测。已打 `mark_debug`，可在 Vivado 里 Set Up Debug 挂 ILA |
 | **OSD**（P8） | `osd_text`：左侧四行数字（fps / 阈值 / 面积 / 填充率）+ 底部直方图条形图。调阈值从「盲调」变成「看着调」，默认关闭 |
 
@@ -450,6 +452,10 @@ Copy-Item _backup_before_vision\ov5640_lcd.xpr.bak prj\ov5640_lcd.xpr -Force
 | `patch_p0_stat.py`、`patch_p0_tb.py`、`patch_p18_wire.py` | P0~P8 的接线与测试台补丁（各自幂等，可重复执行） |
 | `patch_far_predict.py` + `patch_far_predict_fix.py` | P9/P10 的 RTL 补丁：两级面积门槛（远处小灯也认）、`aim_predict` 预测模块接线、UART v2 帧、`reg_file` 新增 `0x0A`（幂等） |
 | `patch_far_predict_tb.py` + `patch_far_predict_tb2.py` | 测试台补丁：相位 10/11/12（远/小目标、速度预测、UART v2 逐字节核对 + 115200 接收监视器） |
+| `patch_blob_timing.py` | 修 50MHz 下的 setup 违例：把 `blob_track` 的选块 + 几何换算拆成三级流水（数据帧内准静态，拆开对功能零影响） |
+| `timing_peek.py` + `timing_peek.tcl` | 时序诊断：从报告抽重点 / 在 routed checkpoint 上列出所有 slack < 1ns 的路径（summary 只给最差 10 条） |
+| `patch_p11_*.py` + `gen_ballistic_lut.py` + `patch_result_frame_v3.py` | P11：距离/下坠补偿（1/w 查表）、上报帧 v3（34 字节 + CRC16 + 帧序号）、把 `RING_T/GATE/ADAPT_PCT` 改成运行时端口 |
+| `tb_probe.v`（在 `sim/`） | 快速探针：只跑 5 帧，打印显示通路各级与**实例内部端口**，20 秒定位 X 扩散（比主测试台 8 分钟快得多） |
 | `model_morph.py` | 视觉管线的 Python 参考模型：验证期望值是怎么来的、试算反光下的行为（不需要综合、不被 xsim 用到） |
 | `to_gbk.py` | 新增文件的中文注释 UTF-8 → GBK（与工程其他文件一致） |
 | `to_simplified_gbk.py` | 把代码档的中文由繁体转成简体、并统一存成 GBK（幂等，可重复执行；`--apply` 才写入） |
@@ -493,8 +499,9 @@ Copy-Item _backup_before_vision\ov5640_lcd.xpr.bak prj\ov5640_lcd.xpr -Force
 | 時序跟蹤（P4） | `track_ab`：門控 + 持久性 + α-β 濾波；**dart 的 PL 沒有這一層** |
 | 遠處小燈也認（P9） | `blob_track` **兩級面積門檻**：嚴檔 400 像素優先；沒有嚴檔時只要面積 ≥ `min_area_lo`（預設 **8**，UART `0x04` 可調）且長寬比 ≤ 8:1、填充率 ≥ 1/4 就接受。修復「綠燈拉遠後螢幕上有高亮卻認不到目標」 |
 | 速度預測 / 提前量（P10） | `aim_predict`：α-β 速度估計（Q4，px/幀）外推 `LEAD_Q4` 幀（預設 4.0 幀 ≈ 133ms@30fps）→ 預測燈心，給雲台打提前量；走 `raw_*` 不加延遲，靜止目標下與不預測逐位一致 |
+| 距離 + 彈道下墜（P11） | `ballistic`：由表觀寬度反推距離與下墜（化簡後**兩者都只是 1/w**，兩張 256 項表，零除法/零乘法）→ `dist_cm` / `drop_px` / **最終瞄準點 `fx,fy`**；彈速用 UART `0x0B` 在線修正 |
 | 自適應閾值（P5） | `chroma_hist`：色度直方圖取分位數當閾值，自動跟著距離 / 光照走；**dart 也沒有** |
-| UART / OSD | 定長結果上報（**v2 = 24 位元組**，新增速度與預測燈心）+ `0xAA` 協議寫參數；OSD 疊數值與直方圖條形圖（皆預設關閉） |
+| UART / OSD | 定長結果上報（**v3 = 34 位元組**，含速度/距離/下墜/最終瞄準點 + CRC16 + 序號）+ `0xAA` 協議寫參數；OSD 疊數值與直方圖條形圖（皆預設關閉） |
 | 標記輸出 | **紅色圓環**套住綠燈（半徑 = (寬+高)/4，環寬 ±`RING_T`）+ **瞄準點紅色十字**；另可切純二值圖模式方便調門檻 |
 | 數碼管 | 6 位共陽數碼管即時顯示「門檻編號 + 選中門檻(000~255) + 目標寬度/10」 |
 | 狀態指示 | 4 顆 LED：目前在調哪個門檻（3 顆）、偵測到目標（常亮 / 未偵測到時 1.5Hz 閃） |

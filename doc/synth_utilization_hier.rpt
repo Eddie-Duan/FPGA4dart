@@ -1,7 +1,7 @@
 Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
 -----------------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
-| Date         : Fri Sep 25 20:00:00 2026
+| Date         : Fri Sep 25 21:02:02 2026
 | Host         : EddieDuanLegionY7000P running 64-bit major release  (build 9200)
 | Command      : report_utilization -hierarchical -file C:/Users/DUANboyang/Desktop/FPGA4dart/doc/synth_utilization_hier.rpt
 | Design       : armor_vision
@@ -21,11 +21,11 @@ Table of Contents
 +-----------------------------------+--------------------------------+------------+------------+---------+------+------+--------+--------+------------+
 |              Instance             |             Module             | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs | RAMB36 | RAMB18 | DSP Blocks |
 +-----------------------------------+--------------------------------+------------+------------+---------+------+------+--------+--------+------------+
-| armor_vision                      |                          (top) |       7326 |       4718 |    2608 |    0 | 2838 |      0 |      0 |         21 |
-|   (armor_vision)                  |                          (top) |        243 |        243 |       0 |    0 |  325 |      0 |      0 |          0 |
+| armor_vision                      |                          (top) |       7171 |       4563 |    2608 |    0 | 2990 |      0 |      0 |         21 |
+|   (armor_vision)                  |                          (top) |        261 |        261 |       0 |    0 |  325 |      0 |      0 |          0 |
 |   u_aim_predict                   |                    aim_predict |        277 |        277 |       0 |    0 |   87 |      0 |      0 |          3 |
-|   u_blob_track                    |                     blob_track |       1891 |       1891 |       0 |    0 |  965 |      0 |      0 |         14 |
-|   u_chroma_hist                   |                    chroma_hist |        670 |        350 |     320 |    0 |  121 |      0 |      0 |          0 |
+|   u_blob_track                    |                     blob_track |       1723 |       1723 |       0 |    0 | 1117 |      0 |      0 |         14 |
+|   u_chroma_hist                   |                    chroma_hist |        665 |        345 |     320 |    0 |  121 |      0 |      0 |          0 |
 |   u_dilate                        |                      morph_nxn |        189 |         85 |     104 |    0 |   72 |      0 |      0 |          0 |
 |     (u_dilate)                    |                      morph_nxn |         32 |         32 |       0 |    0 |   72 |      0 |      0 |          0 |
 |     gen_line_buf[0].u_line_buffer | line_buffer__parameterized0_19 |         32 |         19 |      13 |    0 |    0 |      0 |      0 |          0 |

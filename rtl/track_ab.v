@@ -28,7 +28,6 @@ module track_ab #(
     parameter AW       = 10     ,
     parameter WIDTH    = 800    ,
     parameter HEIGHT   = 480    ,
-    parameter GATE     = 96     ,   // 门控半径（像素）
     parameter HIT_N    = 2      ,   // 连续命中多少帧才报有效
     parameter LOST_N   = 6      ,   // 连续丢失多少帧才放弃
     parameter [7:0] ALPHA_Q8 = 8'd128,  // 0.5
@@ -38,6 +37,7 @@ module track_ab #(
     input                 rst_n      ,
     input                 vsync      ,
 
+    input      [AW-1:0]   gate       ,   // 门控半径（像素，运行时可变；UART 0x08）
     input                 raw_valid  ,   // blob_track 本帧是否找到团块
     input      [AW-1:0]   raw_cx     ,   // 外框中心
     input      [AW-1:0]   raw_cy     ,
@@ -89,7 +89,7 @@ end
 //-------------------------------------------------------
 wire signed [AW+2:0] dx = $signed({1'b0, raw_cx}) - px;
 wire signed [AW+2:0] dy = $signed({1'b0, raw_cy}) - py;
-wire signed [AW+2:0] gate_s = GATE;
+wire signed [AW+2:0] gate_s = $signed({1'b0, gate});
 wire gate_ok = (!tracking) || ((dx >= -gate_s) && (dx <= gate_s) &&
                                (dy >= -gate_s) && (dy <= gate_s));
 

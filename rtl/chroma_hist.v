@@ -30,7 +30,6 @@
 //   资源：2 x (256 x 20bit) 分布式 RAM，约 160 LUT + 一个常量乘法器，0 BRAM。
 //****************************************************************************************//
 module chroma_hist #(
-    parameter [7:0] PCT       = 8'd15  ,   // 前景占比（%），阈值取在 (100-PCT) 分位
     parameter       MIN_TOTAL = 2000       // 有效像素下限
 )(
     input              clk        ,
@@ -41,6 +40,7 @@ module chroma_hist #(
     input      [7:0]   g8         ,
     input      [7:0]   b8         ,
 
+    input      [7:0]   pct        ,   // 前景占比 %（运行时可变；UART 0x09）
     input              en         ,   // ADAPT_EN：0 = 透传手动阈值
     input      [7:0]   th_gr_man  ,
     input      [7:0]   th_gb_man  ,
@@ -140,7 +140,7 @@ always @(posedge clk or negedge rst_n) begin
             SC_IDLE: begin
                 if(vsync_rise) begin
                     //  thr_cnt = total * PCT / 100
-                    thr_cnt  <= (total * PCT) / 8'd100;
+                    thr_cnt  <= (total * pct) / 8'd100;
                     sc_i     <= 9'd255;
                     cum_gr   <= 20'd0;
                     cum_gb   <= 20'd0;

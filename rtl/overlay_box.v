@@ -22,7 +22,6 @@
 
 module overlay_box #(
     parameter AW      = 10,   // 坐标位宽
-    parameter RING_T  = 2 ,   // 圆环宽度（像素）
     parameter CROSS_L = 12,   // 十字臂长度（像素）
     parameter CROSS_T = 1     // 十字线半宽（像素）
 )(
@@ -37,6 +36,7 @@ module overlay_box #(
     input      [AW-1:0]  cy    ,   // 圆心 y（外框中心）
     input      [AW-1:0]  ax    ,   // 瞄准点 x（当前帧几何瞄准点）
     input      [AW-1:0]  ay    ,   // 瞄准点 y（当前帧几何瞄准点）
+    input      [AW-1:0]  ring_t ,   // 圆环宽度（像素，运行时可变；UART 0x06）
     input      [AW-1:0]  pvx   ,   // 预测瞄准点 x
     input      [AW-1:0]  pvy   ,   // 预测瞄准点 y
     input                pv_on ,   // 1 = 画预测十字（目标在动时才画）
@@ -52,8 +52,8 @@ localparam DW2 = 2*AW + 2;        // 平方值位宽（800^2 = 640000 -> 20bit，留 2bi
 wire [AW:0]  w    = {1'b0,br} - {1'b0,bl} + 1'b1;
 wire [AW:0]  h    = {1'b0,bb} - {1'b0,bt} + 1'b1;
 wire [AW:0]  rr   = (w + h) >> 2;
-wire [AW:0]  r_in = (rr > RING_T) ? (rr - RING_T) : {(AW+1){1'b0}};
-wire [AW:0]  r_ou = rr + RING_T;
+wire [AW:0]  r_in = (rr > {1'b0, ring_t}) ? (rr - {1'b0, ring_t}) : {(AW+1){1'b0}};
+wire [AW:0]  r_ou = rr + {1'b0, ring_t};
 
 wire [DW2-1:0] in2  = r_in * r_in;
 wire [DW2-1:0] out2 = r_ou * r_ou;

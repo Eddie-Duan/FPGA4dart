@@ -25,6 +25,8 @@ INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4da
 INFO: [VRFC 10-311] analyzing module track_ab
 INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/aim_predict.v" into library work
 INFO: [VRFC 10-311] analyzing module aim_predict
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/ballistic.v" into library work
+INFO: [VRFC 10-311] analyzing module ballistic
 INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/chroma_hist.v" into library work
 INFO: [VRFC 10-311] analyzing module chroma_hist
 INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/DUANboyang/Desktop/FPGA4dart/rtl/vision_stat.v" into library work
@@ -71,6 +73,7 @@ Compiling module work.video_delay_default
 Compiling module work.blob_track_default
 Compiling module work.track_ab_default
 Compiling module work.aim_predict_default
+Compiling module work.ballistic
 Compiling module work.overlay_box_default
 Compiling module work.osd_text
 Compiling module work.aec_loop
@@ -88,7 +91,7 @@ Built simulation snapshot tb_vision
     ** Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
 
 source C:/Users/DUANboyang/Desktop/FPGA4dart/sim/xsim.dir/tb_vision/webtalk/xsim_webtalk.tcl -notrace
-INFO: [Common 17-206] Exiting Webtalk at Fri Sep 25 19:43:13 2026...
+INFO: [Common 17-206] Exiting Webtalk at Fri Sep 25 21:32:47 2026...
 ---- simulate ----
 
 ****** xsim v2020.2 (64-bit)
@@ -167,60 +170,3 @@ run -all
 ---- phase 6 : key[0] x1 -> select TH_G-B ----
   [OK]   sel = 2 (0x00000002)
 ---- phase 7 : key[3] x1 -> binary display mode ----
-  [OK]   disp_bin = 1 (0x00000001)
-  [OK]   bin_white = 65535 (0x0000ffff)
----- phase 8 : vision_stat instrumentation (P0) ----
-     frame period = H_TOTAL*V_TOTAL = 1056*525 = 554400 clk
-  [OK]   frame_lines = 480 (0x000001e0)
-  [OK]   frame_cyc = 554400 (0x000875a0)
-  [OK]   mask_cnt = 31417 in [30000, 33000]
-  [OK]   hit_frames!=0 = 1 (0x00000001)
-  [OK]   miss_frames!=0 = 1 (0x00000001)
-  [OK]   t_fps = 2 (0x00000002)
-  [OK]   t_frame_lines = 480 (0x000001e0)
----- phase 9 : track_ab unit test (P4) ----
-  [OK]   ta_hit1_valid0 = 0 (0x00000000)
-  [OK]   ta_hit2_valid1 = 1 (0x00000001)
-  [OK]   ta_cx = 400 (expect 400 +-6)
-  [OK]   ta_hold_valid = 1 (0x00000001)
-  [OK]   ta_gate_reject = 1 (0x00000001)
-  [OK]   ta_gate_lost = 4 (0x00000004)
-  [OK]   ta_not_jump = 400 (expect 400 +-40)
-  [OK]   ta_drop_valid = 0 (0x00000000)
----- phase 10 : FAR / SMALL lamp (r=8, ~200 px) ----
-  [OK]   far_valid = 1 (0x00000001)
-  [OK]   far_flag = 1 (0x00000001)
-  [OK]   far_w = 17 in [12, 22]
-  [OK]   far_cx = 408 (expect 408 +-3)
-  [OK]   far_cy = 248 (expect 248 +-3)
-  [OK]   far_lo_off = 0 (0x00000000)
----- phase 11 : MOVING lamp + velocity lead prediction ----
-  [OK]   near_lo_off = 1 (0x00000001)
-  [OK]   mov_pred_ok = 1 (0x00000001)
-  [OK]   mov_flag = 1 (0x00000001)
-  [OK]   mov_vx_pos = 1 (0x00000001)
-  [OK]   mov_lead_dir = 1 (0x00000001)
-  [OK]   mov_lead_amt = 20 in [8, 48]
-  [OK]   mov_ay_inside = 1 (0x00000001)
----- phase 12 : result_frame v2 (24 bytes) over UART ----
-  [OK]   uart_nbytes = 24 (0x00000018)
-  [OK]   uart_hdr0 = 165 (0x000000a5)
-  [OK]   uart_hdr1 = 90 (0x0000005a)
-  [OK]   uart_flags = 179 (0x000000b3)
-  [OK]   uart_cx = 408 (0x00000198)
-  [OK]   uart_cy = 248 (0x000000f8)
-  [OK]   uart_ay = 198 (0x000000c6)
-  [OK]   uart_w = 201 (0x000000c9)
-  [OK]   uart_area7 = 250 (0x000000fa)
-  [OK]   uart_fill = 200 (0x000000c8)
-  [OK]   uart_vx = 96 (0x00000060)
-  [OK]   uart_vy = 0 (0x00000000)
-  [OK]   uart_px = 440 (0x000001b8)
-  [OK]   uart_py = 248 (0x000000f8)
-  [OK]   uart_chk = 86 (0x00000056)
-==== ALL CHECKS PASSED ====
-$finish called at time : 1286259860 ns : File "C:/Users/DUANboyang/Desktop/FPGA4dart/sim/tb_armor_vision.v" Line 808
-run: Time (s): cpu = 00:00:02 ; elapsed = 00:07:59 . Memory (MB): peak = 925.500 ; gain = 0.016
-exit
-INFO: [Common 17-206] Exiting xsim at Fri Sep 25 19:51:18 2026...
-请按任意键继续. . . 

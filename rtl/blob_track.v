@@ -287,13 +287,25 @@ reg  [1:0]  best_i ;
 reg         best_any;
 reg  [31:0] best_are;
 reg  [2:0]  cnt_c   ;
-reg  [AW:0]  tw_c, th_c ;   // 候选块宽 / 高（+1 位防溢出）
-reg  [2*AW+1:0] tp_c    ;   // 宽 x 高
-reg          ss_ok      ;   // 宽松档的形状合理性
+//  ---- 形状合理性（打一拍，把 w*h 乘法移出选块路径）----
+reg  [AW:0]  tw_f, th_f ;   // 候选项宽 / 高（组合过桥）
+reg  [K-1:0] shp_now    ;   // 组合：4 个候选的形状结论
+reg  [K-1:0] shp_ok_r   ;   // 打一拍后的形状结论
 reg          st_any     ;   // 宽松档是否已有候选
 reg  [31:0]  st_are     ;
 reg  [1:0]   st_i       ;
 reg          best_far   ;   // 最终选中的是宽松档
+integer      si         ;
+
+//  ---- 三级流水（数据在帧内准静态，拆开对功能零影响）----
+reg  [1:0]   best_i_r   ;   // 级1：选块结果
+reg          best_any_r ;
+reg          best_far_r ;
+reg  [2:0]   cnt_r      ;
+reg  [AW-1:0] sl_r, sr_r, st_r, sb_r;   // 级2：选中记录的外框
+reg  [31:0]  sa_r, sx_r, sy_r;          // 级2：面积 / 矩
+reg          sany_r, sfar_r;
+reg  [2:0]   scnt_r     ;
 
 //  两级门槛（这就是「远处小绿灯认不出来」的修复点）：
 //    强档：area >= MIN_AREA          -> 近处 / 大目标，优先
@@ -304,6 +316,24 @@ reg          best_far   ;   // 最终选中的是宽松档
 //    长宽比 <= 2^ASPECT_SHIFT，且 area*4 >= w*h（填充率 >= 1/4）
 //  -> 挡掉细长条（画面上的一条绿边）和空心块，但不挡 3x3 的小灯。
 //  min_area_lo = 0 时宽松档关闭，行为与旧版完全一致（逃生开关）。
+//  形状合理性：4 个候选并行算（只有乘法 + 比较，没有优先树）
+//  时序上单独一拍算完 -> 选块那边直接用 shp_ok_r[mi]
+always @(*) begin
+    for(si = 0; si < K; si = si + 1) begin
+        tw_f = {1'b0, r_r[si]} - {1'b0, r_l[si]} + 1'b1;
+        th_f = {1'b0, r_b[si]} - {1'b0, r_t[si]} + 1'b1;
+        shp_now[si] = (tw_f <= (th_f << ASPECT_SHIFT)) &&
+                      (th_f <= (tw_f << ASPECT_SHIFT)) &&
+                      ((r_area[si] << 2) >= (tw_f * th_f));
+    end
+end
+
+//  级1：形状结论打一拍
+always @(posedge clk or negedge rst_n) begin
+    if(!rst_n) shp_ok_r <= {K{1'b0}};
+    else       shp_ok_r <= shp_now;
+end
+
 always @(*) begin
     best_i   = 2'd0;
     best_any = 1'b0;
@@ -314,12 +344,6 @@ always @(*) begin
     st_are   = 32'd0;
     st_i     = 2'd0;
     for(mi = 0; mi < K; mi = mi + 1) begin
-        tw_c = {1'b0, r_r[mi]} - {1'b0, r_l[mi]} + 1'b1;
-        th_c = {1'b0, r_b[mi]} - {1'b0, r_t[mi]} + 1'b1;
-        tp_c = tw_c * th_c;
-        ss_ok = (tw_c <= (th_c << ASPECT_SHIFT)) &&
-                (th_c <= (tw_c << ASPECT_SHIFT)) &&
-                ((r_area[mi] << 2) >= tp_c);
         if(r_used[mi] && (r_area[mi] >= MIN_AREA)) begin
             cnt_c = cnt_c + 3'd1;
             if(!best_any || (r_area[mi] > best_are)) begin
@@ -329,7 +353,7 @@ always @(*) begin
             end
         end
         else if(r_used[mi] && (min_area_lo != 32'd0) &&
-                (r_area[mi] >= min_area_lo) && ss_ok) begin
+                (r_area[mi] >= min_area_lo) && shp_ok_r[mi]) begin
             cnt_c = cnt_c + 3'd1;
             if(!st_any || (r_area[mi] > st_are)) begin
                 st_any = 1'b1;
@@ -346,18 +370,47 @@ always @(*) begin
     end
 end
 
-wire [AW-1:0] bsel_l = r_l[best_i];
-wire [AW-1:0] bsel_r = r_r[best_i];
-wire [AW-1:0] bsel_t = r_t[best_i];
-wire [AW-1:0] bsel_b = r_b[best_i];
-wire [31:0]   bsel_a = r_area[best_i];
-wire [31:0]   bsel_x = r_s2x[best_i];
-wire [31:0]   bsel_y = r_s2y[best_i];
+//  级2：选块结果打一拍
+always @(posedge clk or negedge rst_n) begin
+    if(!rst_n) begin
+        best_i_r   <= 2'd0;
+        best_any_r <= 1'b0;
+        best_far_r <= 1'b0;
+        cnt_r      <= 3'd0;
+    end
+    else begin
+        best_i_r   <= best_i;
+        best_any_r <= best_any;
+        best_far_r <= best_far;
+        cnt_r      <= cnt_c;
+    end
+end
+
+//  级3：选中记录的外框 / 面积 / 矩打一拍
+//  -> 后面的 bw * aim_h_q8 只从本地寄存器出发，布线短、级数少
+always @(posedge clk or negedge rst_n) begin
+    if(!rst_n) begin
+        sl_r <= {AW{1'b0}}; sr_r <= {AW{1'b0}};
+        st_r <= {AW{1'b0}}; sb_r <= {AW{1'b0}};
+        sa_r <= 32'd0; sx_r <= 32'd0; sy_r <= 32'd0;
+        sany_r <= 1'b0; sfar_r <= 1'b0; scnt_r <= 3'd0;
+    end
+    else begin
+        sl_r <= r_l[best_i_r];  sr_r <= r_r[best_i_r];
+        st_r <= r_t[best_i_r];  sb_r <= r_b[best_i_r];
+        sa_r <= r_area[best_i_r];
+        sx_r <= r_s2x[best_i_r];
+        sy_r <= r_s2y[best_i_r];
+        sany_r <= best_any_r;
+        sfar_r <= best_far_r;
+        scnt_r <= cnt_r;
+    end
+end
 
 //  外框中心 / 瞄准点（宽度算术必须扩位，否则 1023+1023 会溢出）
-wire [AW:0]   cx_w = ({1'b0, bsel_l} + {1'b0, bsel_r}) >> 1;
-wire [AW:0]   cy_w = ({1'b0, bsel_t} + {1'b0, bsel_b}) >> 1;
-wire [AW:0]   bw_w = {1'b0, bsel_r} - {1'b0, bsel_l} + 1'b1;
+wire [AW:0]   cx_w = ({1'b0, sl_r} + {1'b0, sr_r}) >> 1;
+wire [AW:0]   cy_w = ({1'b0, st_r} + {1'b0, sb_r}) >> 1;
+wire [AW:0]   bw_w = {1'b0, sr_r} - {1'b0, sl_r} + 1'b1;
 wire [2*AW+8:0] up_full = bw_w * aim_h_q8;
 wire [AW+8:0]   up_t    = up_full >> 8;
 
@@ -406,31 +459,31 @@ always @(posedge clk or negedge rst_n) begin
         dv_quo <= 32'd0; dv_cnt <= 6'd0;
     end
     else if(vsync_fall) begin
-        bond_valid <= best_any;
-        blob_cnt   <= cnt_c;
-        blob_far   <= best_far;
-        if(best_any) begin
-            bond_l    <= bsel_l;
-            bond_r    <= bsel_r;
-            bond_t    <= bsel_t;
-            bond_b    <= bsel_b;
+        bond_valid <= sany_r;
+        blob_cnt   <= scnt_r;
+        blob_far   <= sfar_r;
+        if(sany_r) begin
+            bond_l    <= sl_r;
+            bond_r    <= sr_r;
+            bond_t    <= st_r;
+            bond_b    <= sb_r;
             center_x  <= cx_w[AW-1:0];
             center_y  <= cy_w[AW-1:0];
             aim_x     <= cx_w[AW-1:0];
             aim_y     <= ay_s[AW-1:0];       // 饱和，不回绕
-            blob_area <= bsel_a;
-            lat_x <= bsel_x;
-            lat_y <= bsel_y;
-            lat_a <= bsel_a;
-            lat_l <= bsel_l; lat_r <= bsel_r;
-            lat_t <= bsel_t; lat_b <= bsel_b;
+            blob_area <= sa_r;
+            lat_x <= sx_r;
+            lat_y <= sy_r;
+            lat_a <= sa_r;
+            lat_l <= sl_r; lat_r <= sr_r;
+            lat_t <= st_r; lat_b <= sb_r;
             dv_state <= DVB_RUN;
             dv_step  <= 2'd0;
             dv_cnt   <= 6'd32;
             dv_rem   <= 33'd0;
             dv_quo   <= 32'd0;
-            dv_dend  <= bsel_x;
-            dv_dsor  <= bsel_a << 1;                 // 2*area
+            dv_dend  <= sx_r;
+            dv_dsor  <= sa_r << 1;                 // 2*area
         end
         else begin
             blob_area <= 32'd0;
