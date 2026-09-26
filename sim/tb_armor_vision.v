@@ -884,8 +884,10 @@ initial begin
     chk("mov_flag",    {31'b0, u_armor_vision.pd_mov}, 32'd1);
     chk("mov_vx_pos",  (u_armor_vision.pd_vx > 16'sd48), 32'd1);
     chk("mov_lead_dir",(u_armor_vision.pd_cx > center_x), 32'd1);
+    //  P13c：提前量改成按距离自动算（w≈199 -> 0.71m -> 35ms -> 1.06 帧 -> lead_q4=17）
+    chk_range("mov_lead_auto", {24'd0, u_armor_vision.pd_lead}, 32'd16, 32'd18);
     chk_range("mov_lead_amt",
-              {22'b0, u_armor_vision.pd_cx} - {22'b0, center_x}, 32'd8, 32'd48);
+              {22'b0, u_armor_vision.pd_cx} - {22'b0, center_x}, 32'd4, 32'd12);
     chk("mov_ay_inside", (u_armor_vision.pd_ay <= center_y), 32'd1);
     img_cx = 11'd400;
     wait_frames(2);

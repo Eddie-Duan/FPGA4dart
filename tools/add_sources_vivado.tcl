@@ -70,7 +70,7 @@ update_compile_order -fileset sources_1
 # ---- 5) 汇总，并逐一确认新增模块都在 ----
 set want {vision_stat.v blob_track.v track_ab.v chroma_hist.v median3x3.v \
           uart_tx.v uart_rx.v result_frame.v reg_file.v aec_loop.v osd_text.v \
-          aim_predict.v}
+          aim_predict.v ballistic.v temporal_acc.v}
 set lack {}
 foreach w $want {
     if {[llength [get_files -quiet [file join $rtl $w]]] == 0} { lappend lack $w }

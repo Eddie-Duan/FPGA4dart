@@ -352,8 +352,11 @@ always @(*) begin
                 best_i   = mi[1:0];
             end
         end
+        //  P14：面积 <= 32 的极小团块免掉长宽比/填充率检查 —— 那个尺寸下量化误差主导，
+        //  检查只会把远处的绿灯误杀（症状：屏幕上有绿色高亮，但 bond_valid=0）。
         else if(r_used[mi] && (min_area_lo != 32'd0) &&
-                (r_area[mi] >= min_area_lo) && shp_ok_r[mi]) begin
+                (r_area[mi] >= min_area_lo) &&
+                (shp_ok_r[mi] || (r_area[mi] <= 32'd32))) begin
             cnt_c = cnt_c + 3'd1;
             if(!st_any || (r_area[mi] > st_are)) begin
                 st_any = 1'b1;
@@ -408,6 +411,50 @@ always @(posedge clk or negedge rst_n) begin
 end
 
 //  外框中心 / 瞄准点（宽度算术必须扩位，否则 1023+1023 会溢出）
+//  ---- P14 外框 3 帧中值：干掉单帧离群值（斜置屏幕反光/AWB 抖动）----
+//  用中值而不是 IIR：中值对恒定/匀速目标几乎没有滞后，IIR 会给运动目标带来固定滞后。
+function [AW:0] med3;
+    input [AW:0] a, b, c;
+    begin
+        med3 = (a > b) ? ((b > c) ? b : ((a > c) ? c : a))
+                       : ((a > c) ? a : ((b > c) ? c : b));
+    end
+endfunction
+
+reg  [AW:0] hl1, hl2, hr1, hr2, ht1, ht2, hb1, hb2;
+reg         have_hist;
+wire [AW:0] sl_f = have_hist ? med3({1'b0, sl_r}, hl1, hl2) : {1'b0, sl_r};
+wire [AW:0] sr_f = have_hist ? med3({1'b0, sr_r}, hr1, hr2) : {1'b0, sr_r};
+wire [AW:0] st_f = have_hist ? med3({1'b0, st_r}, ht1, ht2) : {1'b0, st_r};
+wire [AW:0] sb_f = have_hist ? med3({1'b0, sb_r}, hb1, hb2) : {1'b0, sb_r};
+
+//  历史更新：第一个有效帧「装载」（中值=当帧值），丢失后清历史
+always @(posedge clk or negedge rst_n) begin
+    if(!rst_n) begin
+        hl1 <= {AW+1{1'b0}}; hl2 <= {AW+1{1'b0}};
+        hr1 <= {AW+1{1'b0}}; hr2 <= {AW+1{1'b0}};
+        ht1 <= {AW+1{1'b0}}; ht2 <= {AW+1{1'b0}};
+        hb1 <= {AW+1{1'b0}}; hb2 <= {AW+1{1'b0}};
+        have_hist <= 1'b0;
+    end
+    else if(vsync_fall) begin
+        if(!sany_r) have_hist <= 1'b0;
+        else if(!have_hist) begin
+            hl1 <= {1'b0, sl_r}; hl2 <= {1'b0, sl_r};
+            hr1 <= {1'b0, sr_r}; hr2 <= {1'b0, sr_r};
+            ht1 <= {1'b0, st_r}; ht2 <= {1'b0, st_r};
+            hb1 <= {1'b0, sb_r}; hb2 <= {1'b0, sb_r};
+            have_hist <= 1'b1;
+        end
+        else begin
+            hl2 <= hl1; hl1 <= {1'b0, sl_r};
+            hr2 <= hr1; hr1 <= {1'b0, sr_r};
+            ht2 <= ht1; ht1 <= {1'b0, st_r};
+            hb2 <= hb1; hb1 <= {1'b0, sb_r};
+        end
+    end
+end
+
 wire [AW:0]   cx_w = ({1'b0, sl_r} + {1'b0, sr_r}) >> 1;
 wire [AW:0]   cy_w = ({1'b0, st_r} + {1'b0, sb_r}) >> 1;
 wire [AW:0]   bw_w = {1'b0, sr_r} - {1'b0, sl_r} + 1'b1;
@@ -420,6 +467,15 @@ wire [AW+8:0]   up_t    = up_full >> 8;
 //  AIM_H_Q8 = 372 时偏移 = 1.449 x 灯宽，必然超过灯心 y，所以必须先补这里。
 wire [AW+8:0] cy_l = {9'd0, cy_w[AW-1:0]};
 wire [AW+8:0] ay_s = (cy_l >= up_t) ? (cy_l - up_t) : {(AW+9){1'b0}};
+
+//  同样的东西，但用「3 帧中值」后的外框（输出给下游用这个）
+wire [AW:0]     cx_f = (sl_f + sr_f) >> 1;
+wire [AW:0]     cy_f = (st_f + sb_f) >> 1;
+wire [AW:0]     bw_f = sr_f - sl_f + 1'b1;
+wire [2*AW+8:0] up_full_f = bw_f * aim_h_q8;
+wire [AW+8:0]   up_t_f    = up_full_f >> 8;
+wire [AW+8:0]   cy_l_f    = {9'd0, cy_f[AW-1:0]};
+wire [AW+8:0]   ay_f      = (cy_l_f >= up_t_f) ? (cy_l_f - up_t_f) : {(AW+9){1'b0}};
 
 //-------------------------------------------------------
 // 串行移位除法器（帧末算 3 次：cent_x / cent_y / fill）
@@ -463,14 +519,15 @@ always @(posedge clk or negedge rst_n) begin
         blob_cnt   <= scnt_r;
         blob_far   <= sfar_r;
         if(sany_r) begin
-            bond_l    <= sl_r;
-            bond_r    <= sr_r;
-            bond_t    <= st_r;
-            bond_b    <= sb_r;
-            center_x  <= cx_w[AW-1:0];
-            center_y  <= cy_w[AW-1:0];
-            aim_x     <= cx_w[AW-1:0];
-            aim_y     <= ay_s[AW-1:0];       // 饱和，不回绕
+            //  P14: 下游（矄准偏移 / 距离 / 下坠 / 圆环）统一用 3 帧中值后的框
+            bond_l    <= sl_f[AW-1:0];
+            bond_r    <= sr_f[AW-1:0];
+            bond_t    <= st_f[AW-1:0];
+            bond_b    <= sb_f[AW-1:0];
+            center_x  <= cx_f[AW-1:0];
+            center_y  <= cy_f[AW-1:0];
+            aim_x     <= cx_f[AW-1:0];
+            aim_y     <= ay_f[AW-1:0];       // 饱和，不回绕
             blob_area <= sa_r;
             lat_x <= sx_r;
             lat_y <= sy_r;

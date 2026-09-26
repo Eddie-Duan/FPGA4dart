@@ -35,7 +35,13 @@ module reg_file (
     output reg [7:0]   r_pct     ,
     output reg [7:0]   r_lead_q4 ,
     output reg [7:0]   r_drop_sc ,
-    output reg [7:0]   r_tacc    ,   // 0x0C 多帧累积（b1:0=阈值 b7=强制清零）   // 0x0B 弹速修正（Q8，255 = 20m/s）   // 速度预测提前量（帧 x16，Q4）
+    output reg [7:0]   r_tacc    ,
+    output reg [7:0]   r_syn_spd ,   // 0x0D P13 合成靶标速度（有符号 Q4 px/帧）
+    output reg [7:0]   r_syn_r   ,   // 0x0E P13 合成靶标半径（像素）
+    output reg [7:0]   r_syn_en  ,   // 0x0F P13 1 = 用合成靶标代替相机
+    output reg [7:0]   r_st_page ,   // 0x10 P13 数码管状态页
+    output reg [7:0]   r_flags2   ,  // 0x12 P14 b0 = 强制打开 α-β 跟踪器
+    output reg [7:0]   r_lead_auto,  // 0x11 P13 1 = 提前量由距离自动算   // 0x0C 多帧累积（b1:0=阈值 b7=强制清零）   // 0x0B 弹速修正（Q8，255 = 20m/s）   // 速度预测提前量（帧 x16，Q4）
     output reg         wr_pulse      // �в�����д������һ�����壨�ɽ� LED ��ʾ��
 );
 
@@ -69,7 +75,13 @@ always @(posedge clk or negedge rst_n) begin
         r_pct      <= 8'd15;
         r_lead_q4  <= 8'd64;
         r_drop_sc  <= 8'd255;
-        r_tacc     <= 8'h02;      // 阈值 2（默认），不清零   // 4.0 帧（30fps 下约 133ms 提前量）
+        r_tacc     <= 8'h02;
+        r_syn_spd  <= 8'd80;      // 5.0 px/帧（Q4 = 80）
+        r_syn_r    <= 8'd60;      // 直径 120px：落在「推荐取景 100~130px」范围内
+        r_syn_en   <= 8'd0;       // 默认用相机
+        r_st_page  <= 8'd0;       // 默认正常显示页
+        r_flags2   <= 8'd0;       // P14：默认不强制开跟踪器
+        r_lead_auto<= 8'd1;       // 默认按距离自动算提前量      // 阈值 2（默认），不清零   // 4.0 帧（30fps 下约 133ms 提前量）
     end
     else begin
         wr_pulse <= 1'b0;
@@ -105,6 +117,12 @@ always @(posedge clk or negedge rst_n) begin
                                 8'h0A: r_lead_q4  <= data_t;
                                 8'h0B: r_drop_sc  <= data_t;
                                 8'h0C: r_tacc     <= data_t;
+                                8'h0D: r_syn_spd  <= data_t;
+                                8'h0E: r_syn_r    <= data_t;
+                                8'h0F: r_syn_en   <= data_t;
+                                8'h10: r_st_page  <= data_t;
+                                8'h11: r_lead_auto<= data_t;
+                                8'h12: r_flags2   <= data_t;
                                 default: ;              // δ֪��ַ����
                             endcase
                         end

@@ -28,6 +28,14 @@ sequence number and CRC-16**), and **optional multi-frame temporal accumulation*
 saturating per-pixel counter that rejects single-frame dropouts and single-frame noise — **off by
 default**, and a zero-latency pass-through when off).
 
+P13 adds a **distance-adaptive lead** table (`lead_q4 = 3392.4/w` — the lead *is* the time of
+flight), an **on-board synthetic target** (`syn_target`) so the whole chain can be self-tested with
+no camera or lamp, and a **7-seg status page** (`0x10`). P14 attacks field-observed instability: a
+**median-of-3 box filter** in `blob_track` plus a **tiny-blob shape exemption** — the median keeps
+the box steady when the screen is oblique, so the width (and therefore lead, distance and drop) no
+longer jitters frame to frame, and the exemption is what finally lets a **distant lamp** be judged a
+lamp instead of just "something green".
+
 ```
 OV5640 (RGB565 800×480) → DDR3 ping-pong buffer → [ green seg → morphology → dual projection → overlay ] → LCD
                                                                                     └→ 6-digit 7-seg
@@ -39,8 +47,8 @@ OV5640 (RGB565 800×480) → DDR3 ping-pong buffer → [ green seg → morpholog
 | **Camera** | OV5640, RGB565, 800×480 |
 | **Display** | 4.3" RGB LCD, 800×480, pixel clock 25 MHz (1:1, no scaling) |
 | **Tool** | Vivado 2020.2 |
-| **Verification** | `xsim` self-checking testbench — **126 checks, `ALL CHECKS PASSED`** (P12 added a 9-check accumulator phase + two-frame UART verification with an *in-testbench software CRC*; a seconds-long standalone unit test for the accumulator ships as `sim/tb_tacc.v`) |
-| **Synthesis** | 0 errors / 0 warnings / 0 latches — LUT 7488 (36.0%), FF 3237 (7.8%), LUTRAM 2608, DSP 24, **BRAM 24 RAMB36 (48% of 50)** |
+| **Verification** | `xsim` self-checking testbench — **129 checks, `ALL CHECKS PASSED`** (P12/P13 added accumulator, two-frame UART verification with an in-testbench software CRC, and the P13 lead table; seconds-long standalone unit tests ship as `sim/tb_tacc.v` and `sim/tb_p13.v`. P14's median box filter loads its history on the first valid frame, so a static scene stays bit-identical and the count is unchanged) |
+| **Synthesis** | 0 errors / 0 warnings / 0 latches — LUT 7760 (37.3%), FF 3315 (8.0%), LUTRAM 2608, DSP 27, **BRAM 24 RAMB36 (48% of 50)** |
 | **Timing** | `clk_out2` (50 MHz) is the tight domain; the P9 blob-selection chain missed it by 5.2 ns and is now split into a 3-stage pipeline (frame-static data) — see doc §19. Out-of-context pre-check now reports WNS **+6.64 ns** |
 | **Reference** | color test from the dart2026 open-source FPGA IP (`Threshold.v`); fixed-exposure approach from its `hikrobot.cpp` |
 | **License** | MIT (see [LICENSE](LICENSE)) |
@@ -105,10 +113,14 @@ LEDs: `led[0..2]` which threshold is selected · `led[3]` target detected (solid
 | **速度预测 / 提前量**（P10） | `aim_predict`：用最近几帧灯心做 α-β 速度估计（Q4，px/帧），外推 `LEAD_Q4` 帧（默认 4.0 帧 ≈ 133ms@30fps，UART `0x0A` 可调）→ 输出**预测灯心**，直接给云台打提前量。走 `raw_*` 路径**不加延迟**；静止目标下与不预测逐位一致。LCD 上黄色十字 = 预测瞄准点（只在目标在动时画） |
 | **距离 + 弹道下坠**（P11） | `ballistic`：由表观宽度反推距离与下坠（推导后**两者都只是 1/w**，两张 256 项表搞定，零除法/零乘法）。输出 `dist_cm` / `drop_px` / **最终瞄准点 `fx,fy`**（预测灯心 + 几何偏移 + 下坠补偿）——**云台直接用它**。弹速不用重新综合：UART `0x0B` 写 DROP_SCALE |
 | **多帧累积提灵敏度**（P12） | `temporal_acc`：800×480×2bit 块 RAM 的 **2 bit 饱和计数器** —— 命中 +1、未命中 -1（饱和），`acc >= thr`（默认 2）才算亮。把「连续几帧都亮」的真目标粘住（中间丢一帧也不掉），单帧噪点只到 1 就被拒绝。输出延 2 拍，`x/y/de` 同步延 2 拍对齐；**默认关闭**（关闭时零延迟直通，行为与不加完全相同）。约需 21~22 个 RAMB36 |
+| **提前量物理化**（P13c） | `aim_predict` 内建一张 `lead_q4 = 3392.4/w` 表（同样只是 1/w）：提前量 = 飞行时间 = 距离/弹速，**随距离自动变**（0.71m → 1.06 帧/35ms，5.05m → 7.6 帧/253ms）。原来的固定 4 帧在近处过冲 4 倍、5m 处欠 2 倍。`0x11=0` 或宽度不合理时回退手动 `0x0A` |
+| **板上合成靶标**（P13a） | `syn_target`：RTL 造的**匀速往返绿圆**，UART `0x0F=1` 打开后顶替相机像素（`0x0D` 速度、`0x0E` 半径）→ **不用相机/灯/上位机就能自检全链路**，而且速度精确已知（可以和上报的 `vx_q4` 对表）。默认关闭 |
+| **板上状态页**（P13d） | UART `0x10` 切换：数显管高位显示 **距离(cm) / 宽度(px) / 速度(px/帧)**，LED 显示 `pred_ok / moving / dist_ok`，不接串口也能调参 |
+| **外框抗抖 + 远距离灯**（P14） | 现场反馈：**屏幕斜置**时绿灯认得出，但外框每帧抖十几像素 → `w` 抖 → 提前量(1.449w)/距离(14135/w)/下坠(4454.5/w) 全跟着抖 → `pd_mov` 反复激活、黄十字乱闪。修法：① `blob_track` 四条边各存 2 帧历史，输出取 **3 帧中值**（`sl_f/sr_f/st_f/sb_f`），`cx/cy/bw/aim` 全部由中值框导出（**首个有效帧直接装载历史 → 静态场景逐位不变**，相位 1 检查原样通过；不用 IIR 是因为 IIR 对匀速目标有固定相位滞后，会把提前量打歪）；② 小团块（`area <= 32`）**免形状检查** —— 远距离只有几个像素时形状量量化太粗，原来「面积够但长宽比不合格」被卡掉，这正是「**拉远只能高亮为绿色、判不出是灯**」的原因；③ `MOVE_Q4` 16→32（2 px/帧），减少把 1px 残抖误判成「目标在动」；④ 新增 `0x12` 位0，可在运行中强制打开 α-β 跟踪器做二次平滑 |
 | **自适应阈值**（P5） | `chroma_hist`：每帧统计 `G-R` / `G-B` 的 256 bin 直方图，帧末取分位数当阈值（默认「色度最高的 15% 像素」），阈值自动跟着距离 / 光照走。**dart 也没有这个**（它靠 PS 写寄存器） |
 | **曝光闭环**（P6） | `aec_loop`：统计过曝（三通道同时 >200）像素比例，超上限就降曝光、低于下限就升曝光，带死区与速率限制。**这是对「手猜曝光导致黑屏」的正确修复**；默认关闭 |
 | **中值预滤波**（P7） | `median3x3`：分离式 3×3 中值，二值化前压强噪声。默认关闭（关闭时零延迟） |
-| **UART 接口**（P1/P2/P11） | `result_frame` 定长上报（**v3 = 34 字节**：新增速度、预测灯心、距离、下坠、**最终瞄准点 fx/fy**、帧序号，并把异或换成 **CRC-16**）；`reg_file` 用 `0xAA addr data (addr^data)` 运行时写参数（`0x03/0x04/0x06/0x08/0x09/0x0A/0x0B` 全部真接上了），**不用重新综合** |
+| **UART 接口**（P1/P2/P11） | `result_frame` 定长上报（**v3 = 34 字节**：新增速度、预测灯心、距离、下坠、**最终瞄准点 fx/fy**、帧序号，并把异或换成 **CRC-16**）；`reg_file` 用 `0xAA addr data (addr^data)` 运行时写参数（`0x03/0x04/0x06/0x08/0x09/0x0A/0x0B/0x11/0x12` 全部真接上了），**不用重新综合** |
 | **仪表盘**（P0） | `vision_stat`：帧率 / 帧周期 / 帧行数 / 掩码像素数 / 命中率，纯观测。已打 `mark_debug`，可在 Vivado 里 Set Up Debug 挂 ILA |
 | **OSD**（P8） | `osd_text`：左侧四行数字（fps / 阈值 / 面积 / 填充率）+ 底部直方图条形图。调阈值从「盲调」变成「看着调」，默认关闭 |
 
@@ -207,7 +219,7 @@ xvlog ..\rtl\temporal_acc.v tb_tacc.v ; xelab -debug typical tb_tacc -s tacc_sna
 
 测试台造出与 `lcd_driver`（800×480 面板）**完全相同**的时序，图像为
 **一个绿色实心圆**（圆心 (400,240)、半径 100、`RGB565 = 0x750E` → `r8=118 g8=162 b8=118`，
-即 `G-R = G-B = 44`），并验证 **126 项**（下表为相位 1~2 的 44 项明细，其余见 `doc/vision_pipeline.md` §11）：
+即 `G-R = G-B = 44`），并验证 **129 项**（下表为相位 1~2 的 44 项明细，其余见 `doc/vision_pipeline.md` §11）：
 
 | 阶段 | 检查 | 期望 | 说明 |
 |---|---|---|---|
@@ -230,7 +242,7 @@ xvlog ..\rtl\temporal_acc.v tb_tacc.v ; xelab -debug typical tb_tacc -s tacc_sna
 | 6 | `sel` | 2 | 再按 `key[0]` 一次 → 选中项切到 `TH_G-B` |
 | 7 | `disp_bin` / `bin_white` | 1 / `0xFFFF` | 按 `key[3]` → 纯二值模式，圆内显示白色 |
 
-实测输出：`==== ALL CHECKS PASSED ====`（14 个相位共 126 项；`sim/tb_tacc.v` 另有 11 项秒级单测）。
+实测输出：`==== ALL CHECKS PASSED ====`（14 个相位共 129 项；`sim/tb_tacc.v` 11 项 + `sim/tb_p13.v` 17 项秒级单测）。
 
 > **阶段 2 是关键回归**：旧版「取最长连续 run」的投影在这里会退化成
 > `h≈84`、`center_y≈190`（框只剩上半边）—— 那就是「转一点角度就识别不到」的现场。
@@ -379,10 +391,10 @@ $$1.449\,W \;\le\; c_y \;\le\; 479 - W/2 \quad\Longrightarrow\quad W \le 245\tex
 | `overlay_box`（圆环两个平方 + 十字） | 56 | 0 | 0 | 4 |
 | `seg_display` | 32 | 0 | 19 | 0 |
 | 顶层与显示合成 | 44 | 0 | 205 | 0 |
-| **合计** | **7488（36.0%）** | 2608 | **3237（7.8%）** | **24（26.7%）** |
+| **合计** | **7760（37.3%）** | 2608 | **3315（8.0%）** | **27（30.0%）** |
 
 > 上表各模块数字是 P3 之前的旧值（已过期，保留作对照）；**当前实测**见这一行：
-> **`armor_vision` OOC 合计 LUT 7488（36.0%）/ FF 3237（7.8%）/ DSP 24（26.7%）/ LUTRAM 2608**，
+> **`armor_vision` OOC 合计 LUT 7760（37.3%）/ FF 3315（8.0%）/ DSP 27（30.0%）/ LUTRAM 2608**，
 > 其中 **Block RAM 24 个 RAMB36（48%）—— 全部来自 P12 的 `temporal_acc`**（其余模块仍推给 LUTRAM）。
 > 7A35T 共 50 个 RAMB36：24（累积器）+ 原 39 例程的两条视频 FIFO，能装下但余量不宽裕；
 > 不够时把 `acc_mem` 改成 1 bit 即可减半（12 个）。
@@ -399,8 +411,9 @@ $$1.449\,W \;\le\; c_y \;\le\; 479 - W/2 \quad\Longrightarrow\quad W \le 245\tex
 
 ### 9. 常见问题 / 调试
 
-| 症状 | 处理 |
+| 现象 | 处理 |
 |---|---|
+| **综合报 `[Synth 8-439] module 'xxx' not found`** | 新加的 `rtl/*.v` 没登记进工程。**Vivado 开着时外部改 `.xpr` 会被它保存时静默抹掉** —— 必须在该工程的 **Tcl Console** 里执行 `source {<仓库>/tools/add_sources_vivado.tcl}`，然后重新 Run Synthesis。命令行自查：`python tools/check_xpr_sources.py` |
 | 完全没标记、`led[3]` 一直闪 | ① 按 `key[3]` 切纯二值图，用 `key[0]`+`key[1]`/`key[2]` 把绿色调干净 ② 看数码管确认阈值 ③ `TH_MIN` / `MIN_SIZE` 是否设太大 |
 | 二值图里绿圆是**白色一片** | 相机曝光把灯打爆成白色了（饱和后 `G-R ≈ 0` 判不出颜色）→ 调小 `i2c_ov5640_rgb565_cfg.v` 里的曝光 `EXP_*` |
 | **一转身屏幕角度就整个识别不到** | **已处理**：根因是 LCD 镜面反射 → OV5640 的 AEC/AWB 把整幅画面的亮度/色彩一起拉走，固定阈值全线失守。主力是两条**尺度无关**的算法措施：相对饱和度闸（`color_seg.v`）+ 「取外沿」投影（`proj_bond.v`），都不依赖相机设置。可选的相机固定曝光见下一行 |
@@ -479,6 +492,11 @@ Copy-Item _backup_before_vision\ov5640_lcd.xpr.bak prj\ov5640_lcd.xpr -Force
 | `patch_p11_*.py` + `gen_ballistic_lut.py` + `patch_result_frame_v3.py` | P11：距离/下坠补偿（1/w 查表）、上报帧 v3（34 字节 + CRC16 + 帧序号）、把 `RING_T/GATE/ADAPT_PCT` 改成运行时端口 |
 | `patch_p12_tacc.py` + `patch_p12_tb.py` + `patch_p12_fix.py` | P12：多帧累积（新增 `rtl/temporal_acc.v`，2 bit 饱和计数器）、`reg_file` 新增 `0x0C`、测试台相位 14 与 UART **两帧**核对（序号递增 + testbench 侧软件 CRC 对拍） |
 | `fix_tb_dump.py` | 修上一个补丁留下的坑：`re.sub` 会把替换串里的 `\n` 当换行展开，改成 `str.replace`（写 Verilog 字符串字面量时注意） |
+| `patch_p13_main.py` / `patch_p13_main2.py` / `patch_p13_main3.py` | P13 主体：`aim_predict` 内建提前量表（`0x11` 自动/手动）、新增 `syn_target.v`、`armor_vision` 接线（像素源二选一 + 状态页 mux） |
+| `patch_p13_regfile.py` / `patch_p13_tb.py` / `patch_p13_build.py` | P13：寄存器 `0x0D~0x11`、主测试台相位 11 期望值改成物理值、仿真/综合脚本加新文件 |
+| `patch_p13_synfix2.py` / `patch_p13_fixw.py` / `patch_p13_move.py` | P13 修错：`r2` 改成跟 `rad` 变、速度立即生效、状态页 mux 位宽、声明必须在 `bond_w` 之后 |
+| `patch_p14_stab.py` / `patch_p14_stab2.py` | P14：`blob_track` 加 **3 帧中值外框**（`sl_f/sr_f/st_f/sb_f` + `cx_f/cy_f/bw_f/ay_f`）+ 小团块免形状检查、`aim_predict` 的 `MOVE_Q4` 16→32、`reg_file` 新增 `0x12`、`armor_vision` 接 `trk_on`（幂等，可重复执行） |
+| `check_xpr_sources.py` | 对比「磁盘上的 `rtl/*.v`」与「工程 `.xpr` 登记的」：综合报 `[Synth 8-439] module 'xxx' not found` 就是它。`--add` 可补进 `.xpr`（Vivado 必须关着；GUI 开着时只能在 Tcl Console 跑 `add_sources_vivado.tcl`） |
 | `tb_probe.v`（在 `sim/`） | 快速探针：只跑 5 帧，打印显示通路各级与**实例内部端口**，20 秒定位 X 扩散（比主测试台 8 分钟快得多） |
 | `model_morph.py` | 视觉管线的 Python 参考模型：验证期望值是怎么来的、试算反光下的行为（不需要综合、不被 xsim 用到） |
 | `to_gbk.py` | 新增文件的中文注释 UTF-8 → GBK（与工程其他文件一致） |
@@ -528,6 +546,10 @@ Copy-Item _backup_before_vision\ov5640_lcd.xpr.bak prj\ov5640_lcd.xpr -Force
 | 速度預測 / 提前量（P10） | `aim_predict`：α-β 速度估計（Q4，px/幀）外推 `LEAD_Q4` 幀（預設 4.0 幀 ≈ 133ms@30fps）→ 預測燈心，給雲台打提前量；走 `raw_*` 不加延遲，靜止目標下與不預測逐位一致 |
 | 距離 + 彈道下墜（P11） | `ballistic`：由表觀寬度反推距離與下墜（化簡後**兩者都只是 1/w**，兩張 256 項表，零除法/零乘法）→ `dist_cm` / `drop_px` / **最終瞄準點 `fx,fy`**；彈速用 UART `0x0B` 在線修正 |
 | 多幀累積提靈敏度（P12） | `temporal_acc`：800×480×2bit 塊 RAM 的 **2 bit 飽和計數器** —— 命中 +1、未命中 -1（飽和），`acc >= thr`（預設 2）才算亮。把「連續幾幀都亮」的真目標黏住（中間丟一幀也不掉），單幀雜點只到 1 就被拒絕。輸出延 2 拍，`x/y/de` 同步延 2 拍對齊；**預設關閉**（關閉時零延遲直通，行為與不加完全相同）。約需 21~22 個 RAMB36 |
+| 提前量物理化（P13c） | `aim_predict` 內建一張 `lead_q4 = 3392.4/w` 表：提前量 = 飛行時間 = 距離/彈速，**隨距離自動變**（0.71m → 1.06 幀/35ms，5.05m → 7.6 幀/253ms）；`0x11=0` 或寬度不合理時回退手動 `0x0A` |
+| 板上合成靶標（P13a） | `syn_target`：RTL 造的**匀速往返綠圓**，UART `0x0F=1` 打開後頂替相機像素（`0x0D` 速度、`0x0E` 半徑）→ **不用相機/燈/上位機就能自檢全鏈路**；預設關閉 |
+| 板上狀態頁（P13d） | UART `0x10` 切換：數碼管高位顯示 **距離/寬度/速度**，LED 顯示 `pred_ok / moving / dist_ok` |
+| 外框抗抖 + 遠距離燈（P14） | 現場反饋：**螢幕斜置**時綠燈認得出，但外框每幀抖十幾像素 → `w` 抖 → 提前量(1.449w)/距離(14135/w)/下墜(4454.5/w) 全跟著抖 → `pd_mov` 反覆激活、黃十字亂閃。修法：① `blob_track` 四條邊各存 2 幀歷史，輸出取 **3 幀中值**（`sl_f/sr_f/st_f/sb_f`），`cx/cy/bw/aim` 全由中值框導出（**首個有效幀直接裝載歷史 → 靜態場景逐位不變**；不用 IIR 是因為它對勻速目標有固定相位滯後）；② 小團塊（`area <= 32`）**免形狀檢查** —— 遠距離只有幾個像素時形狀量量化太粗，原本「面積夠但長寬比不合格」被卡掉，這正是「**拉遠只能高亮為綠色、判不出是燈**」的原因；③ `MOVE_Q4` 16→32（2 px/幀）；④ 新增 `0x12` 位0，可在執行中強制打開 α-β 跟蹤器 |
 | 自適應閾值（P5） | `chroma_hist`：色度直方圖取分位數當閾值，自動跟著距離 / 光照走；**dart 也沒有** |
 | UART / OSD | 定長結果上報（**v3 = 34 位元組**，含速度/距離/下墜/最終瞄準點 + CRC16 + 序號）+ `0xAA` 協議寫參數；OSD 疊數值與直方圖條形圖（皆預設關閉） |
 | 標記輸出 | **紅色圓環**套住綠燈（半徑 = (寬+高)/4，環寬 ±`RING_T`）+ **瞄準點紅色十字**；另可切純二值圖模式方便調門檻 |
@@ -615,7 +637,7 @@ cd sim
 > 本輪就是縿它抓出累積器「寫地址錯一拍」的 bug，詳見 `doc/vision_pipeline.md` §22。
 
 測試台造出與 `lcd_driver`（800×480 面板）**完全相同**的時序，影像為
-**一個綠色實心圓**（圓心 (400,240)、半徑 100、`RGB565 = 0x750E` → `r8=118 g8=162 b8=118`），並驗證 **126 項**
+**一個綠色實心圓**（圓心 (400,240)、半徑 100、`RGB565 = 0x750E` → `r8=118 g8=162 b8=118`），並驗證 **129 項**
 （下表為階段 1~2 的 44 項明細，其餘見 `doc/vision_pipeline.md` §11）：
 
 | 階段 | 檢查 | 期望 | 說明 |
@@ -635,7 +657,7 @@ cd sim
 | 6 | `sel` | 2 | 再按 `key[0]` 一次 → 選中項切到 `TH_G-B` |
 | 7 | `disp_bin` / `bin_white` | 1 / `0xFFFF` | 按 `key[3]` → 純二值模式，圓內顯示白色 |
 
-實測輸出：`==== ALL CHECKS PASSED ====`（14 個階段共 126 項；`sim/tb_tacc.v` 另有 11 項秒級單測）。
+實測輸出：`==== ALL CHECKS PASSED ====`（14 個階段共 129 項；`sim/tb_tacc.v` 11 項 + `sim/tb_p13.v` 17 項秒級單測）。
 
 > **階段 2 是關鍵回歸**：舊版「取最長連續 run」的投影在這裡會退化成 `h≈84`、`center_y≈190`
 > （框只剩上半邊）—— 那就是「轉一點角度就識別不到」的現場。改成「取外沿」後，
@@ -712,6 +734,7 @@ Block RAM 0。原 39 例程的資源仍然充裕。完整報告：`doc/synth_uti
 
 | 症狀 | 處理 |
 |---|---|
+| **綜合報 `[Synth 8-439] module 'xxx' not found`** | 新加的 `rtl/*.v` 沒登記進工程。**Vivado 開著時外部改 `.xpr` 會被它儲存時靜默抹掉** —— 必須在該工程的 Tcl Console 裡 `source {<倉庫>/tools/add_sources_vivado.tcl}`，再 Run Synthesis。命令行自查：`python tools/check_xpr_sources.py` |
 | 完全沒有標記、`led[3]` 一直閃 | ① 按 `key[3]` 切純二值圖，把綠色調乾淨 ② `TH_MIN` / `MIN_SIZE` 是否設太大 |
 | 二值圖裡綠圓是**白色一片** | 相機曝光把燈打爆成白色了 → 調小 `i2c_ov5640_rgb565_cfg.v` 裡的 `EXP_*` |
 | **一轉螢幕角度就整個識別不到** | **已處理**：根因是 LCD 鏡面反射 → OV5640 的 AEC/AWB 把整幅畫面的亮度/色彩一起拉走。主力是兩條**尺度無關**的算法措施：相對飽和度閘（`color_seg.v`）+ 「取外沿」投影（`proj_bond.v`），都不依賴相機設定 |
@@ -747,10 +770,11 @@ Block RAM 0。原 39 例程的資源仍然充裕。完整報告：`doc/synth_uti
 | `to_gbk.py` | 新增檔案的中文註解 UTF-8 → GBK |
 | `to_simplified_gbk.py` | 中文由繁體轉簡體並統一存成 GBK |
 | `check_project_paths.py` | 檢查 `.xpr` 引用的檔案是否都在 |
+| `check_xpr_sources.py` | **對比「磁碟上的 `rtl/*.v`」與「工程 `.xpr` 登記的」**：綜合報 `[Synth 8-439] module 'xxx' not found` 就是它。`--add` 可補進 `.xpr`（Vivado 必須關著）；GUI 開著時只能在 Tcl Console 跑 `add_sources_vivado.tcl` |
 | `patch_p11_*.py` + `gen_ballistic_lut.py` + `patch_result_frame_v3.py` | P11：距離/下墜補償、上報幀 v3（34 位元組 + CRC16 + 序號）、三個參數改運行時端口 |
 | `patch_p12_tacc.py` + `patch_p12_tb.py` + `patch_p12_fix.py` | P12：多幀累積（新增 `rtl/temporal_acc.v`）、`reg_file` 新增 `0x0C`、測試台相位 14 與 UART **兩幀**核對（序號遞增 + 軟體 CRC 對拍） |
 | `fix_tb_dump.py` | 修補丁工具的字面量轉義坑（`re.sub` 會把替換串裡的 `\n` 展開，改成 `str.replace`） |
-
+| `patch_p13_*.py` | P13：`aim_predict` 內建提前量表（`0x11` 自動/手動）、新增 `rtl/syn_target.v`、寄存器 `0x0D~0x11`、狀態頁 mux、建置腳本加新檔 || `patch_p14_stab.py` + `patch_p14_stab2.py` | P14：`blob_track` 加 **3 幀中值外框** + 小團塊免形狀檢查、`aim_predict` 的 `MOVE_Q4` 16→32、`reg_file` 新增 `0x12`、`armor_vision` 接 `trk_on`（冪等，可重複執行） |
 ### 13. 編碼注意（**很重要**）
 
 - `rtl/*.v`、`prj/**/*.xdc` 等 Vivado 檔案是 **GBK** 編碼（Vivado 在中文 Windows 下用 ANSI）。

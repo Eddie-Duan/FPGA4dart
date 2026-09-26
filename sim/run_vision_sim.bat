@@ -29,6 +29,7 @@ call xvlog -nolog ^
   ..\rtl\track_ab.v ^
   ..\rtl\aim_predict.v ^
   ..\rtl\ballistic.v ^
+  ..\rtl\syn_target.v ^
   ..\rtl\temporal_acc.v ^
   ..\rtl\chroma_hist.v ^
   ..\rtl\vision_stat.v ^

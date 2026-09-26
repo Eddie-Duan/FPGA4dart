@@ -215,6 +215,15 @@ wire [7:0]    rf_tacc        ;   // 0x0C
 wire [1:0]    thr_eff        ;   // 累积阈值
 wire          tacc_en, tacc_clr;
 wire          mask_t, de_t   ;   // 累积后的掩码（与 x_t/y_t 对齐）
+
+//  ---- P13 ----
+wire [7:0]    rf_syn_spd, rf_syn_r, rf_syn_en, rf_st_page, rf_lead_auto, rf_flags2;
+wire          syn_on   ;
+wire [15:0]   syn_pix  ;
+wire [15:0]   cam_pix  ;   // 真正进管线的像素（相机 or 合成）
+wire [AW-1:0] syn_cx   ;
+wire [1:0]    st_page  ;
+wire [7:0]    pd_lead  ;   // 实际使用的提前量（ILA/仿真观测）
 wire [AW-1:0] x_t, y_t       ;
 
 //*****************************************************
@@ -310,6 +319,12 @@ reg_file u_reg_file (
     .r_lead_q4  (rf_lead_q4 ),
     .r_drop_sc  (rf_drop_sc ),
     .r_tacc     (rf_tacc    ),
+    .r_syn_spd  (rf_syn_spd ),
+    .r_syn_r    (rf_syn_r   ),
+    .r_syn_en   (rf_syn_en  ),
+    .r_st_page  (rf_st_page ),
+    .r_lead_auto(rf_lead_auto),
+    .r_flags2   (rf_flags2   ),
     .wr_pulse   (rf_wr_pulse )
 );
 
@@ -327,6 +342,7 @@ wire osd_on_e = OSD_EN   | rf_ctrl[4];
 wire pred_on  = PRED_EN  | rf_ctrl[5];   // b5 = 速度预测使能
 wire dist_on  = DIST_EN  | rf_ctrl[6];   // b6 = 弹道补偿使能
 wire tacc_on  = TACC_EN  | rf_ctrl[7];   // b7 = 多帧累积使能
+wire trk_on   = TRK_EN   | rf_flags2[0];  // P14：0x12 bit0 可在运行中打开 α-β 跟踪器
 
 wire [7:0] th_g  = reg_written ? rf_th_g  : th_g_kbd;
 wire [7:0] th_gr = adapt_on ? th_gr_auto : (reg_written ? rf_th_gr : th_gr_kbd);
@@ -349,9 +365,33 @@ assign thr_eff     = reg_written ? rf_tacc[1:0] : 2'd2;
 assign tacc_en     = tacc_on;
 assign tacc_clr    = reg_written & rf_tacc[7];
 
+
 //-------------------------------------------------------
 // (3) 中值预滤波（MED 关时纯直通，零延迟）
 //-------------------------------------------------------
+//-------------------------------------------------------
+// (2c) P13a 合成靶标：UART 0x0F=1 时顶替相机像素（默认关闭，行为与原来完全一致）
+//-------------------------------------------------------
+assign syn_on = rf_syn_en[0];
+
+syn_target #(
+    .AW     (AW    ),
+    .WIDTH  (IMG_W ),
+    .HEIGHT (IMG_H )
+) u_syn_target (
+    .clk    (clk        ),
+    .rst_n  (rst_n      ),
+    .vsync  (vsync      ),
+    .x      (x_v        ),
+    .y      (y_cnt      ),
+    .spd_q4 (rf_syn_spd ),
+    .rad    (rf_syn_r   ),
+    .pix    (syn_pix    ),
+    .cx     (syn_cx     )
+);
+
+assign cam_pix = syn_on ? syn_pix : data_v;
+
 median3x3 #(
     .WIDTH (IMG_W),
     .AW    (AW   )
@@ -360,13 +400,13 @@ median3x3 #(
     .rst_n (rst_n  ),
     .de    (de_v   ),
     .x     (x_v    ),
-    .din   (data_v ),
+    .din   (cam_pix),
     .de_o  (med_de ),
     .x_o   (med_x  ),
     .dout  (med_pix)
 );
 
-assign pix_seg = med_on ? med_pix : data_v;
+assign pix_seg = med_on ? med_pix : cam_pix;
 
 //-------------------------------------------------------
 // (4) 自适应阈值：色度直方图
@@ -452,7 +492,7 @@ video_delay #(
     .rst_n (rst_n  ),
     .de    (de_v   ),
     .x     (x_v    ),
-    .din   (data_v ),
+    .din   (cam_pix),
     .dout  (img_d  )
 );
 
@@ -598,19 +638,21 @@ aim_predict #(
     .rst_n     (rst_n     ),
     .vsync     (vsync     ),
     .en        (pred_on   ),
-    .raw_valid (TRK_EN ? trk_valid : raw_valid),
-    .cx        (TRK_EN ? trk_cx    : raw_cx   ),
-    .cy        (TRK_EN ? trk_cy    : raw_cy   ),
+    .raw_valid (trk_on ? trk_valid : raw_valid),
+    .cx        (trk_on ? trk_cx    : raw_cx   ),
+    .cy        (trk_on ? trk_cy    : raw_cy   ),
     .bw        (bond_w    ),
     .aim_h_q8  (aim_h_eff ),
     .lead_q4   (lead_q4_eff),
+    .lead_auto (rf_lead_auto[0]),
     .pcx       (pd_cx     ),
     .pcy       (pd_cy     ),
     .pay       (pd_ay     ),
     .vx_q4     (pd_vx     ),
     .vy_q4     (pd_vy     ),
     .pred_ok   (pd_ok     ),
-    .moving    (pd_mov    )
+    .moving    (pd_mov    ),
+    .lead_used (pd_lead   )
 );
 
 //-------------------------------------------------------
@@ -792,17 +834,29 @@ vision_stat #(
 //-------------------------------------------------------
 // (16) 6 位数码管：显示三个阈值 / 目标尺寸
 //-------------------------------------------------------
+
+//  P13d 状态页：0 = 正常  1 = 距离(cm)/下坠  2 = 宽度(px)/距离  3 = 速度(px/帧)
+assign st_page = rf_st_page[1:0];
+
+wire [7:0] st_v3 = (st_page == 2'd1) ? bl_dist_cm[7:0] :
+                   (st_page == 2'd2) ? bond_w[7:0] :
+                   (st_page == 2'd3) ? ((pd_vx[15]) ? 8'd0 : {1'b0, pd_vx[14:7]}) : th_g;
+wire [7:0] st_w2 = (st_page == 2'd1) ? bl_drop_px[7:0] :
+                   (st_page == 2'd2) ? bl_dist_cm[7:0] :
+                   (st_page == 2'd3) ? bond_w[7:0] : 8'd0;
+
 seg_display #(
     .CLK_FREQ (CLK_FREQ)
 ) u_seg_display (
     .clk        (clk        ),
     .rst_n      (rst_n      ),
     .sel        (sel        ),
-    .th_g       (th_g   ),
-    .th_gr      (th_gr  ),
-    .th_gb      (th_gb  ),
+    .th_g       ((st_page == 2'd0) ? th_g : st_v3),
+    .th_gr      ((st_page == 2'd0) ? th_gr : st_v3),
+    .th_gb      ((st_page == 2'd0) ? th_gb : st_v3),
     .bond_valid (bond_valid ),
-    .bond_w     (bond_w     ),
+    .bond_w     ((st_page == 2'd0) ? bond_w : {{(AW-7){1'b0}}, st_w2}),
+    //  ↑ 必须正好 (AW+1) 位：seg_display 的 bond_w 是 [10:0]，多一位少一位都会 warning
     .disp_bin   (disp_bin   ),
     .seg_sel    (seg_sel    ),
     .seg_led    (seg_led    )
@@ -823,9 +877,10 @@ end
 
 wire hb = hb_cnt[23];      // 25MHz 下约 0.34s 翻转 -> 约 1.5Hz
 
-assign led[0] = ~(sel == 2'd0);
-assign led[1] = ~(sel == 2'd1);
-assign led[2] = ~(sel == 2'd2);
+//  状态页时 LED 改成状态位（不用接串口）：led[0]=预测有效 led[1]=目标在动 led[2]=距离有效
+assign led[0] = ~((st_page != 2'd0) ? pd_ok  : (sel == 2'd0));
+assign led[1] = ~((st_page != 2'd0) ? pd_mov : (sel == 2'd1));
+assign led[2] = ~((st_page != 2'd0) ? bl_ok  : (sel == 2'd2));
 assign led[3] = ~(bond_valid ? 1'b1 : hb);
 
 endmodule
