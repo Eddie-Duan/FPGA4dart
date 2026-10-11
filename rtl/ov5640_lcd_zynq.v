@@ -27,16 +27,22 @@
 //     - the board has a single PL key, used here as sys reset; armor_vision's
 //       key bus is tied idle and thresholds are changed over UART instead
 //     - the board has no 7-segment display, so seg_sel/seg_led stay internal
-//     - AXI is wired straight to S_AXI_HP0 (AXI3, 128-bit). AWLEN/ARLEN only use
-//       the low 4 bits, which is enough for the 16-beat bursts axi_frame_buf issues.
+//     - AXI is wired straight to S_AXI_HP0 (AXI3, 64-bit, 6-bit IDs). Each
+//       128-bit FIFO word is transferred as two 64-bit beats.
 //----------------------------------------------------------------------------------------
 
 `timescale 1ns / 1ps
 
 module ov5640_lcd_zynq (
+    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 UI_CLK CLK",
+       X_INTERFACE_PARAMETER = "XIL_INTERFACENAME UI_CLK, ASSOCIATED_BUSIF M_AXI, ASSOCIATED_RESET rst_n, FREQ_HZ 100000000" *)
     input          ui_clk        , // FCLK_CLK0, 100 MHz
-    input          lcd_sys_clk   , // FCLK_CLK1, 50 MHz
-    input          rst_n         , // PS peripheral reset, active low
+    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 LCD_SYS_CLK CLK",
+       X_INTERFACE_PARAMETER = "XIL_INTERFACENAME LCD_SYS_CLK, FREQ_HZ 50000000" *)
+    input          lcd_sys_clk   , // FCLK_CLK1,  50 MHz
+    (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 rst_n RST",
+       X_INTERFACE_PARAMETER = "XIL_INTERFACENAME rst_n, POLARITY ACTIVE_LOW" *)
+    input          rst_n         , // PS reset, active low
 
     // camera DVP on header J7
     input          cam_pclk      ,
@@ -62,46 +68,86 @@ module ov5640_lcd_zynq (
     input          uart_rxd      ,
     output         uart_txd      ,
 
-    // AXI4 master -> PS S_AXI_HP0
+    // AXI3 master -> PS S_AXI_HP0
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWADDR",
+       X_INTERFACE_PARAMETER = "XIL_INTERFACENAME M_AXI, PROTOCOL AXI3, DATA_WIDTH 64, ADDR_WIDTH 32, ID_WIDTH 6, FREQ_HZ 100000000, READ_WRITE_MODE READ_WRITE, MAX_BURST_LENGTH 16, HAS_BURST 1, HAS_CACHE 1, HAS_LOCK 1, HAS_PROT 1, HAS_QOS 0, SUPPORTS_NARROW_BURST 0" *)
     output [31:0]  m_axi_awaddr  ,
-    output [7:0]   m_axi_awlen   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWID" *)
+    output [5:0]   m_axi_awid    ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWLEN" *)
+    output [3:0]   m_axi_awlen   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWSIZE" *)
     output [2:0]   m_axi_awsize  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWBURST" *)
     output [1:0]   m_axi_awburst ,
-    output         m_axi_awlock  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWLOCK" *)
+    output [1:0]   m_axi_awlock  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWCACHE" *)
     output [3:0]   m_axi_awcache ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWPROT" *)
     output [2:0]   m_axi_awprot  ,
-    output [3:0]   m_axi_awqos   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWVALID" *)
     output         m_axi_awvalid ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI AWREADY" *)
     input          m_axi_awready ,
-    output [127:0] m_axi_wdata   ,
-    output [15:0]  m_axi_wstrb   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI WID" *)
+    output [5:0]   m_axi_wid     ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI WDATA" *)
+    output [63:0]  m_axi_wdata   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI WSTRB" *)
+    output [7:0]   m_axi_wstrb   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI WLAST" *)
     output         m_axi_wlast   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI WVALID" *)
     output         m_axi_wvalid  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI WREADY" *)
     input          m_axi_wready  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI BID" *)
+    input  [5:0]   m_axi_bid     ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI BRESP" *)
     input  [1:0]   m_axi_bresp   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI BVALID" *)
     input          m_axi_bvalid  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI BREADY" *)
     output         m_axi_bready  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARADDR" *)
     output [31:0]  m_axi_araddr  ,
-    output [7:0]   m_axi_arlen   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARID" *)
+    output [5:0]   m_axi_arid    ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARLEN" *)
+    output [3:0]   m_axi_arlen   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARSIZE" *)
     output [2:0]   m_axi_arsize  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARBURST" *)
     output [1:0]   m_axi_arburst ,
-    output         m_axi_arlock  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARLOCK" *)
+    output [1:0]   m_axi_arlock  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARCACHE" *)
     output [3:0]   m_axi_arcache ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARPROT" *)
     output [2:0]   m_axi_arprot  ,
-    output [3:0]   m_axi_arqos   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARVALID" *)
     output         m_axi_arvalid ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI ARREADY" *)
     input          m_axi_arready ,
-    input  [127:0] m_axi_rdata   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI RDATA" *)
+    input  [63:0]  m_axi_rdata   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI RID" *)
+    input  [5:0]   m_axi_rid     ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI RRESP" *)
     input  [1:0]   m_axi_rresp   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI RVALID" *)
     input          m_axi_rvalid  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI RLAST" *)
     input          m_axi_rlast   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI RREADY" *)
     output         m_axi_rready
 );
 
 //--------------------------------------------------------------------------
 // internal signals
 //--------------------------------------------------------------------------
-wire         init_calib_complete;   // DDR usable, from axi_frame_buf
+wire         startup_delay_done;    // delay only; DDR must be initialized by PS boot
 wire         sys_init_done;
 wire         lcd_clk;               // 25 MHz pixel clock out of lcd_rgb_top
 wire         rd_vsync;              // LCD frame start
@@ -112,6 +158,7 @@ wire  [15:0] lcd_data;
 wire  [15:0] wrdata;                // camera pixels, RGB565
 wire         cmos_frame_vsync;
 wire         cmos_frame_valid;
+wire         cam_init_done;
 
 wire  [12:0] h_disp;
 wire  [12:0] v_disp;
@@ -133,11 +180,12 @@ wire  [3:0]  vision_led;
 wire  [5:0]  seg_sel;
 wire  [7:0]  seg_led;
 wire         vision_bond_valid;
+wire         axi_error;
 
-assign sys_init_done = init_calib_complete;
+assign sys_init_done = startup_delay_done;
 
-// the only onboard PL LED shows the vision LED[3] (target detected)
-assign led = vision_led[3];
+// The only onboard PL LED shows target detection or an AXI response error.
+assign led = vision_led[3] | axi_error;
 
 //--------------------------------------------------------------------------
 // camera configuration and DVP capture
@@ -166,7 +214,8 @@ ov5640_dri u_ov5640_dri (
     .cam_pwdn          (cam_pwdn          ),
     .cam_scl           (cam_scl           ),
     .cam_sda           (cam_sda           ),
-    .capture_start     (init_calib_complete),
+    .capture_start     (startup_delay_done && cam_init_done),
+    .cam_init_done     (cam_init_done     ),
     .cmos_h_pixel      (h_disp            ),
     .cmos_v_pixel      (v_disp            ),
     .total_h_pixel     (total_h_pixel     ),
@@ -204,7 +253,7 @@ ddr3_fifo_ctrl u_ddr3_fifo_ctrl (
 axi_frame_buf u_axi_frame_buf (
     .ui_clk               (ui_clk             ),
     .rst_n                (rst_n              ),
-    .init_calib_complete  (init_calib_complete),
+    .startup_delay_done   (startup_delay_done),
     .wfifo_dout           (wfifo_dout         ),
     .wfifo_rcount         (wfifo_rcount       ),
     .wfifo_rden           (wfifo_rden         ),
@@ -215,38 +264,42 @@ axi_frame_buf u_axi_frame_buf (
     .rd_load              (rd_vsync           ),
     .ddr3_read_valid      (1'b1               ),
     .m_axi_awaddr         (m_axi_awaddr       ),
+    .m_axi_awid           (m_axi_awid         ),
     .m_axi_awlen          (m_axi_awlen        ),
     .m_axi_awsize         (m_axi_awsize       ),
     .m_axi_awburst        (m_axi_awburst      ),
     .m_axi_awlock         (m_axi_awlock       ),
     .m_axi_awcache        (m_axi_awcache      ),
     .m_axi_awprot         (m_axi_awprot       ),
-    .m_axi_awqos          (m_axi_awqos        ),
     .m_axi_awvalid        (m_axi_awvalid      ),
     .m_axi_awready        (m_axi_awready      ),
+    .m_axi_wid            (m_axi_wid          ),
     .m_axi_wdata          (m_axi_wdata        ),
     .m_axi_wstrb          (m_axi_wstrb        ),
     .m_axi_wlast          (m_axi_wlast        ),
     .m_axi_wvalid         (m_axi_wvalid       ),
     .m_axi_wready         (m_axi_wready       ),
+    .m_axi_bid            (m_axi_bid          ),
     .m_axi_bresp          (m_axi_bresp        ),
     .m_axi_bvalid         (m_axi_bvalid       ),
     .m_axi_bready         (m_axi_bready       ),
     .m_axi_araddr         (m_axi_araddr       ),
+    .m_axi_arid           (m_axi_arid         ),
     .m_axi_arlen          (m_axi_arlen        ),
     .m_axi_arsize         (m_axi_arsize       ),
     .m_axi_arburst        (m_axi_arburst      ),
     .m_axi_arlock         (m_axi_arlock       ),
     .m_axi_arcache        (m_axi_arcache      ),
     .m_axi_arprot         (m_axi_arprot       ),
-    .m_axi_arqos          (m_axi_arqos        ),
     .m_axi_arvalid        (m_axi_arvalid      ),
     .m_axi_arready        (m_axi_arready      ),
     .m_axi_rdata          (m_axi_rdata        ),
+    .m_axi_rid            (m_axi_rid          ),
     .m_axi_rresp          (m_axi_rresp        ),
     .m_axi_rvalid         (m_axi_rvalid       ),
     .m_axi_rlast          (m_axi_rlast        ),
-    .m_axi_rready         (m_axi_rready       )
+    .m_axi_rready         (m_axi_rready       ),
+    .axi_error            (axi_error          )
     );
 
 //--------------------------------------------------------------------------

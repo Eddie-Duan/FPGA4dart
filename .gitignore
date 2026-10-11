@@ -9,6 +9,17 @@ prj/ov5640_lcd.cache/
 prj/ov5640_lcd.ip_user_files/
 prj/.Xil/
 
+# Zynq Vivado products; the project Tcl recreates these from its tracked sources.
+prj/zynq_vision/zynq_vision.gen/
+prj/zynq_vision/zynq_vision.runs/
+prj/zynq_vision/zynq_vision.cache/
+prj/zynq_vision/zynq_vision.hw/
+prj/zynq_vision/zynq_vision.sim/
+prj/zynq_vision/zynq_vision.ip_user_files/
+prj/zynq_vision/zynq_vision.srcs/sources_1/bd/system/ip/
+prj/zynq_vision/ip/*/
+prj/zynq_vision/.Xil/
+
 # Vivado 执行记录 / 产物
 *.jou
 *.log

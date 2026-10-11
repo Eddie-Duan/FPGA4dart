@@ -1,14 +1,12 @@
-# ZYNQ 侧测试计划（XC7Z020 demo 板）
+# ZYNQ PL 测试计划（挑战者底板，XC7Z020）
 
-> 本文是 **FPGA4dart 的 ZYNQ 阶段测试计划**：7A35T 上已经跑通的 PL 视觉管线，搬到 ZYNQ-7020
-> 上做 demo，需要补做哪些测试、按什么顺序、每项的通过判据是什么。
+> 本轮目标是把 7A35T 上已跑通的 800×480 PL 视觉测试搬到 Zynq-7020：
+> 摄像头和 LCD 仍由 PL 驱动，PS 不运行 Linux，只负责上电初始化其 DDR3，PL 经 HP0 AXI3 访问帧缓存。
 > 姊妹文档：[README.md](README.md)（7A35T 现状）、[doc/vision_pipeline.md](doc/vision_pipeline.md)（设计细节）。
 >
-> **Scope (EN)**: what remains to be verified once the proven Artix-7 pipeline moves to a
-> Zynq-7020 board — PS/PL interfaces (AXI-Lite registers, frame-end interrupt, VDMA/DDR path),
-> bare-metal smoke tests in Vitis 2020.2, the PetaLinux 2020.2 main line that matches the dart
-> target, actuators/IMU, end-to-end latency, resource fit **against xc7z010** (the real dart
-> device, which is *smaller* than this demo board), and a regression/baseline routine.
+> **Scope (EN)**: keep the existing PL camera → frame buffer → vision → LCD test path and
+> resolution. The Zynq PS is used only to initialize its DDR3; no Linux or application software
+> is part of this test.
 
 ---
 
@@ -25,75 +23,48 @@
 | 运行时可调参数（不用重新综合） | `reg_file.v` UART `0xAA addr data (addr^data)`，19 个寄存器已接 |
 | 资源与时序 | OOC 综合 LUT **7760 (37.3%)** / FF 3315 / DSP 27 / BRAM **24 RAMB36**（全来自 `temporal_acc`）；OOC WNS **+6.64 ns** |
 
-**没证明（= 本文要补的）**
+**Zynq 移植状态**
 
-1. **PS/PL 接口一个都没做**：仓库里没有任何 AXI / VDMA / `processing_system7` / 中断代码
-   （`rtl/`、`sim/` 全搜过了），只有注释里提过 dart 的 AXI4-Lite 做法。
-2. **DDR3 通路必须换掉**：7A35T 上用的是**自研 DDR3 控制器**（`ddr3_top.v` / `ddr3_rw.v` /
-   `ddr3_fifo_ctrl.v`）。ZYNQ 上 DDR3 归 PS（MIG 在 PS 里），PL **只能经 AXI HP 口 / VDMA** 访问 ——
-   这不是"改个参数"，是数据通路的重新设计。
-3. **视觉管线目前是"寄生"在 DDR3 读出 → LCD 写入之间**（输入 `rddata/rdata_req/rd_vsync`，
-   输出直接进 `lcd_rgb_top`）。而飞镖上没有屏幕，ZYNQ 版本要把它变成**有自己 AXI 接口的 IP**。
-4. **时钟域变了**：现在是 `lcd_clk` 25 MHz + `clk_out2` 50 MHz（50 MHz 是紧的域，
-   `blob_track` 就曾在那里违例 5.2 ns）。ZYNQ 上没有 LCD 时管线时钟、相机 PCLK 域与 AXI 100 MHz 域
-   三者之间的关系要重新定，**不是随便提频就能跑**。
-5. **没有端到端时延数据**：UART 帧是 8 帧发一次（≈3.75 Hz@30fps），只能证明"功能对"，
-   证明不了"延迟小"；飞镖的制导窗口约 1.5 s，延迟必须实测。
-6. **没有舵机 / IMU / 图传 / 遥测**：这些是飞镖的必备项，7A35T 上完全没有。
-7. **资源核算没按目标器件（xc7z010）做过**：7020 比 7010 大得多，**在这块板上跑通 ≠ 装得进飞镖的片子**。
+1. **PL 设计和独立 Vivado 工程已建立**：`axi_frame_buf.v` 将 128-bit FIFO 数据拆成 HP0 的两个 64-bit AXI3 beat；Zynq 顶层和 PS7 block-design 创建脚本已加入，Vivado 2020.2 综合通过。
+2. **PS DDR 必须先初始化**：AXI 帧缓存内的启动计数器只是复位释放后的短延时，不是 DDR 校准/ready 检测。用 FSBL 或 Vivado/Vitis 的 PS 初始化流程完成 DDR 初始化后，PL 才能访问帧缓存。
+3. **当前帧格式保持 800×480 RGB565**；PS DDR 采用双页缓存，视觉管线和 LCD 路径沿用现有 PL 模块。
+4. **已验证**：Vivado 2020.2 综合；AXI3 64-bit burst 背压、数据顺序、WLAST 和 FIFO 打包仿真。**未验证**：PS 初始化后 DDR 实际读写，以及相机到 LCD 的上板测试。
+5. Linux、VDMA、飞镖目标 xc7z010 资源核算、IMU/舵机和图传属于后续产品化工作，不属于本轮测试范围。
 
 ---
 
-## 0.1 开工前需要你确认的 5 件事
+## 0.1 本轮已确认的硬件与启动方式
 
-| # | 问题 | 为什么重要 | 不同答案的分支 |
+| 项目 | 当前选择 | 设计影响 |
 |---|---|---|---|
-| 1 | 7020 板的**具体型号** | 决定引脚约束、PS 配置、例程与文档来源 | **已识别为正点原子 ZYNQ 小系统板（MicroSYS），XC7Z020CLG400-2**；以官方例程/XDC 为基准 |
-| 2 | 板上有**摄像头接口**（DVP/OV5640）吗？有 **LCD** 吗？ | 决定视觉输入源 | 无相机 → 用 `syn_target`（已有）或 DDR 回放做像素源；无 LCD → 连 LCD 通路一起砍掉 |
-| 3 | 板上有 **以太网 PHY** 或 WiFi 吗？ | 决定图传/遥测走网口还是串口 | 无网口 → demo 阶段用 UART 上报（已有 `uart_parse.py`），图传留到飞镖真板 |
-| 4 | 先做**裸机（Vitis）**还是直接上 **Linux（PetaLinux）**？ | 决定整个测试顺序 | 建议先裸机冒烟（1~2 天），再上 Linux；两者接口形状要一致（见 §2） |
-| 5 | 有 **PetaLinux 2020.2 环境**吗（Ubuntu 18.04/20.04 虚拟机或 WSL）？ | 飞镖的软件栈是 PetaLinux 2020.2 | 本机只有 Windows 侧 Vivado/Vitis **2020.2**（已确认安装）；PetaLinux 需要 Linux 主机（本机装了 VMware Workstation，可用 Ubuntu 18.04 VM） |
+| 板卡 | 挑战者底板，XC7Z020CLG400-2 | 使用 Zynq 专用工程和独立约束 |
+| 摄像头/LCD | 摄像头以杜邦线接 J7（bank35）；LCD 保持 AWM 连接 | 避开 P1 摄像头座与 LCD 的 bank34 复用 |
+| 处理范围 | PL 运行图像处理；PS 不运行 Linux | PS 仅提供 FCLK、复位和 DDR3 初始化 |
+| 存储 | PS DDR3 经 HP0 AXI3，64-bit、6-bit ID，16-beat burst | 128-bit FIFO word 拆为两个 64-bit beat |
+| PS DDR 初始化 | FSBL 或 Vivado/Vitis PS 初始化脚本 | 不可把 PL 中的启动延时当作 DDR ready |
 
-> **板卡已确认**：正点原子 ZYNQ 小系统板（MicroSYS），`xc7z020clg400-2`。已交叉核对三处资料并完全一致：
-> A盘 `ZYNQ_MicroSYS_IO.xdc`、`ZYNQ小系统开发板 IO引脚分配总表.xlsx`，以及根目录 `系统板原理图.pdf`
-> （14 页 Altium 原理图，`11_IO.SchDoc` 的 LCD 连接器与 `Camera IO.xlsx`）。
->
-> **重要硬件约束：摄像头接口与 LCD 接口共用 bank34 引脚。** 18-pin `CAMERA`（P1）排针与 42-pin
-> `RGB TFTLCD` 排针在原理图上**并联**，12 个网络冲突：
->
-> | 共用网络 | FPGA 脚 | LCD 信号 | 摄像头信号 |
-> |---|---|---|---|
-> | B34_L4_P | V12 | LCD_R0 | CMOS_D6 |
-> | B34_L1_N | T10 | LCD_R1 | CMOS_SCL |
-> | B34_L4_N | W13 | LCD_R2 | CMOS_D5 |
-> | B34_L1_P | T11 | LCD_R3 | CMOS_SDA |
-> | B34_L3_P | U13 | LCD_R4 | CMOS_D1 |
-> | B34_L2_N | U12 | LCD_R5 | CMOS_VSYNC |
-> | B34_L3_N | V13 | LCD_R6 | CMOS_D2 |
-> | B34_L2_P | T12 | LCD_R7 | CMOS_HREF |
-> | B34_L6_N | R14 | LCD_G0 | CMOS_D0 |
-> | B34_L6_P | P14 | LCD_G2 | CMOS_RESET |
-> | B34_L11_P | U14 | LCD_G5 | CMOS_D4 |
-> | B34_L11_N | U15 | LCD_G7 | CMOS_D3 |
->
-> 两个座**不能同时插满**：摄像头会丢掉 `D0-D6`、`VSYNC`、`HREF`、`SCL/SDA`、`RESET`；
-> LCD 会丢掉红色全部 8 位和绿色 4 位。
->
-> **解法**：板上有 `J7` / `J8` 两排 2×25P 排针，引出的是 **bank35 / bank13** 的独立引脚（不与 LCD 冲突）。
-> 把摄像头用杜邦线改接到 **J7（bank35）**、LCD 继续留在 RGB LCD 座，两者即可共存。分配表见
-> [prj/zynq_microsys.xdc](prj/zynq_microsys.xdc)（`cam_pclk` 特意选在 bank35 的 SRCC 脚 `L16` = J7-31；
-> 外部 USB-TTL 串口用 J7-47/49）。**J8（bank13 + bank34 剩余）也可用**：J8-31/33/32/34 就是
-> `B34_L8_P/N`、`B34_L10_N/P`，即摄像头原有的 `PCLK/D7/XCLK/PWDN` 网络。
->
-> 该 XDC 只用于后续的 Zynq 顶层工程；当前 `ov5640_lcd.xpr` 仍是 XC7A35T 工程，不能加载它。
-> Zynq 的 DDR3 由 PS 管理，不应沿用现有 PL MIG 引脚。
+约束位于 [prj/zynq_challenger.xdc](prj/zynq_challenger.xdc)，独立工程由
+[prj/create_zynq_vision_project.tcl](prj/create_zynq_vision_project.tcl) 创建；
+**不要把 Zynq XDC/PS 配置加到现有 XC7A35T 的 `ov5640_lcd.xpr`。**
+
+Vivado 2020.2 中执行：
+
+```tcl
+vivado -mode batch -source prj/create_zynq_vision_project.tcl
+```
+
+该脚本生成 `prj/zynq_vision/zynq_vision.xpr` 并运行综合。烧录/测试前必须先执行 PS DDR 初始化；
+该阶段不需要 Linux、PetaLinux 或应用程序。
 
 > 本机已确认：Vivado **2020.2** + Vitis **2020.2** + Vitis_HLS 2020.2（`D:\Xilinx\`），
 > ModelSim SE-64（`D:\Modelsim\win64`）。xsim 与 ModelSim 都能用，与 7A35T 阶段一致。
 
 ---
 
-## 1. 目标架构：ZYNQ 版本应该长什么样
+> **范围说明**：以下 §1–§9 保留为未来飞镖产品化路线图；本轮不实现 Linux、VDMA、AXI-Lite、
+> IRQ、舵机或 IMU。当前 Zynq 摄像头/LCD 测试以本页 §0 与 §0.1 为准。
+
+## 1. 后续飞镖产品化架构（非本轮实现）
 
 ```
         ┌────────────────────────── PL（7020 / 未来 7010） ──────────────────────────┐

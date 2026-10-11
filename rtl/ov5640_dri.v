@@ -46,6 +46,8 @@ module ov5640_dri (
     output  [15:0]  cmos_frame_data    //有效数据
 );
 
+wire i2c_ack;
+
 //parameter define
 parameter SLAVE_ADDR = 7'h3c          ; //OV5640的器件地址7'h3c
 parameter BIT_CTRL   = 1'b1           ; //OV5640的字节地址为16位  0:8位 1:16位
@@ -106,6 +108,7 @@ u_i2c_dri(
     .i2c_data_w         (i2c_data[7:0] ),
     .i2c_data_r         (i2c_data_r    ),
     .i2c_done           (i2c_done      ),
+    .i2c_ack            (i2c_ack       ),
     
     .scl                (cam_scl       ),
     .sda                (cam_sda       ),
