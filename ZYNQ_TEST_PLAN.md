@@ -54,10 +54,39 @@
 | 4 | 先做**裸机（Vitis）**还是直接上 **Linux（PetaLinux）**？ | 决定整个测试顺序 | 建议先裸机冒烟（1~2 天），再上 Linux；两者接口形状要一致（见 §2） |
 | 5 | 有 **PetaLinux 2020.2 环境**吗（Ubuntu 18.04/20.04 虚拟机或 WSL）？ | 飞镖的软件栈是 PetaLinux 2020.2 | 本机只有 Windows 侧 Vivado/Vitis **2020.2**（已确认安装）；PetaLinux 需要 Linux 主机（本机装了 VMware Workstation，可用 Ubuntu 18.04 VM） |
 
-> 板卡资料来自 `G:\ZYNQ7020`：官方 7020 工程目标器件为 `xc7z020clg400-2`，LCD/时钟引脚参考
-> `ZYNQ_7020_FPGA/8_top_lcd_touch/.../top_lcd_touch.xdc`。本仓库的 [Zynq MicroSYS 引脚模板](prj/zynq_microsys.xdc)
-> 只用于后续的 Zynq 顶层工程；当前 `ov5640_lcd.xpr` 仍是 XC7A35T 工程，不能加载该 XDC。
-> Zynq 的 DDR3 由 PS 管理，不应沿用现有 PL MIG 引脚；相机 DVP 与 PL UART 的实际扩展板接线尚需核对后再约束。
+> **板卡已确认**：正点原子 ZYNQ 小系统板（MicroSYS），`xc7z020clg400-2`。已交叉核对三处资料并完全一致：
+> A盘 `ZYNQ_MicroSYS_IO.xdc`、`ZYNQ小系统开发板 IO引脚分配总表.xlsx`，以及根目录 `系统板原理图.pdf`
+> （14 页 Altium 原理图，`11_IO.SchDoc` 的 LCD 连接器与 `Camera IO.xlsx`）。
+>
+> **重要硬件约束：摄像头接口与 LCD 接口共用 bank34 引脚。** 18-pin `CAMERA`（P1）排针与 42-pin
+> `RGB TFTLCD` 排针在原理图上**并联**，12 个网络冲突：
+>
+> | 共用网络 | FPGA 脚 | LCD 信号 | 摄像头信号 |
+> |---|---|---|---|
+> | B34_L4_P | V12 | LCD_R0 | CMOS_D6 |
+> | B34_L1_N | T10 | LCD_R1 | CMOS_SCL |
+> | B34_L4_N | W13 | LCD_R2 | CMOS_D5 |
+> | B34_L1_P | T11 | LCD_R3 | CMOS_SDA |
+> | B34_L3_P | U13 | LCD_R4 | CMOS_D1 |
+> | B34_L2_N | U12 | LCD_R5 | CMOS_VSYNC |
+> | B34_L3_N | V13 | LCD_R6 | CMOS_D2 |
+> | B34_L2_P | T12 | LCD_R7 | CMOS_HREF |
+> | B34_L6_N | R14 | LCD_G0 | CMOS_D0 |
+> | B34_L6_P | P14 | LCD_G2 | CMOS_RESET |
+> | B34_L11_P | U14 | LCD_G5 | CMOS_D4 |
+> | B34_L11_N | U15 | LCD_G7 | CMOS_D3 |
+>
+> 两个座**不能同时插满**：摄像头会丢掉 `D0-D6`、`VSYNC`、`HREF`、`SCL/SDA`、`RESET`；
+> LCD 会丢掉红色全部 8 位和绿色 4 位。
+>
+> **解法**：板上有 `J7` / `J8` 两排 2×25P 排针，引出的是 **bank35 / bank13** 的独立引脚（不与 LCD 冲突）。
+> 把摄像头用杜邦线改接到 **J7（bank35）**、LCD 继续留在 RGB LCD 座，两者即可共存。分配表见
+> [prj/zynq_microsys.xdc](prj/zynq_microsys.xdc)（`cam_pclk` 特意选在 bank35 的 SRCC 脚 `L16` = J7-31；
+> 外部 USB-TTL 串口用 J7-47/49）。**J8（bank13 + bank34 剩余）也可用**：J8-31/33/32/34 就是
+> `B34_L8_P/N`、`B34_L10_N/P`，即摄像头原有的 `PCLK/D7/XCLK/PWDN` 网络。
+>
+> 该 XDC 只用于后续的 Zynq 顶层工程；当前 `ov5640_lcd.xpr` 仍是 XC7A35T 工程，不能加载它。
+> Zynq 的 DDR3 由 PS 管理，不应沿用现有 PL MIG 引脚。
 
 > 本机已确认：Vivado **2020.2** + Vitis **2020.2** + Vitis_HLS 2020.2（`D:\Xilinx\`），
 > ModelSim SE-64（`D:\Modelsim\win64`）。xsim 与 ModelSim 都能用，与 7A35T 阶段一致。
