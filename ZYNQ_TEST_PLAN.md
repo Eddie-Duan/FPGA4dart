@@ -38,7 +38,7 @@
 | 项目 | 当前选择 | 设计影响 |
 |---|---|---|---|
 | 板卡 | 挑战者底板，XC7Z020CLG400-2 | 使用 Zynq 专用工程和独立约束 |
-| 摄像头/LCD | 摄像头以杜邦线接 J7（bank35）；LCD 保持 AWM 连接 | 避开 P1 摄像头座与 LCD 的 bank34 复用 |
+| 摄像头/LCD | LCD 用 AWM 排线；相机 2x9 母座从 P1 拔下，整排插到下方 2x25 排针（3.3V/GND 起 9 列，CMOS2 组） | P1 与 LCD 并了 14 根网络，LCD 插上时 P1 必须空置 |
 | 处理范围 | PL 运行图像处理；PS 不运行 Linux | PS 仅提供 FCLK、复位和 DDR3 初始化 |
 | 存储 | PS DDR3 经 HP0 AXI3，64-bit、6-bit ID，16-beat burst | 128-bit FIFO word 拆为两个 64-bit beat |
 | PS DDR 初始化 | FSBL 或 Vivado/Vitis PS 初始化脚本 | 不可把 PL 中的启动延时当作 DDR ready |

@@ -37,7 +37,7 @@ module ddr3_rw(
     input           ddr3_read_valid      ,  //DDR3读使能
     input           ddr3_pingpang_en     ,  //DDR3乒乓操作使能
     output          rfifo_wren           ,  //从DDR3读出数据的有效使能
-    output  [27:0]  app_addr             ,  //DDR3地址
+    output reg [27:0]  app_addr             ,  //DDR3地址
     output          app_en               ,  //MIG IP核操作使能
     output          app_wdf_wren         ,  //用户写使能
     output          app_wdf_end          ,  //突发写当前时钟最后一个数据
@@ -74,7 +74,7 @@ reg           raddr_page;           //ddr3读地址切换信号
 reg           waddr_page;           //ddr3写地址切换信号
 reg           wr_end;               //一次突发写结束信号
 reg           rd_end;               //一次读发写结束信号 
-reg [27:0]    app_addr;  
+// app_addr 已由端口声明为 reg，不再重复声明
 
 //wire define
 wire          rst_n;

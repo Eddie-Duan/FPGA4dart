@@ -21,9 +21,12 @@
 //   no longer instantiated here.
 //
 //   Board notes:
-//     - the camera is wired to header J7 (bank35); the 18-pin CAMERA header P1
-//       shares 12 bank34 nets with the RGB LCD header and cannot be used at the
-//       same time as the LCD (see ZYNQ_TEST_PLAN.md section 0.1)
+//     - the 18-pin CAMERA header P1 is wired in parallel with the RGB LCD
+//       connector on 14 nets, so P1 must stay empty while the LCD is connected.
+//       The 2x9 camera plug instead goes straight onto the lower 2x25 header:
+//       9 columns starting at the "3.3V"/"GND" column (the "CMOS2" group in the
+//       board IO table). Pin list in prj/zynq_challenger.xdc, wiring table in
+//       ZYNQ_TEST_PLAN.md section 0.1
 //     - the board has a single PL key, used here as sys reset; armor_vision's
 //       key bus is tied idle and thresholds are changed over UART instead
 //     - the board has no 7-segment display, so seg_sel/seg_led stay internal

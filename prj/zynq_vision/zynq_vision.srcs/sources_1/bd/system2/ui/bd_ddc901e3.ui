@@ -1,0 +1,60 @@
+{
+   "ActiveEmotionalView":"Default View",
+   "Default View_ScaleFactor":"0.950434",
+   "Default View_TopLeft":"-140,-183",
+   "ExpandedHierarchyInLayout":"",
+   "guistr":"# # String gsaved with Nlview 7.0r6  2020-01-29 bk=1.5227 VDI=41 GEI=36 GUI=JA:10.0 non-TLS
+#  -string -flagsOSRD
+preplace port DDR -pg 1 -lvl 4 -x 1350 -y 140 -defaultsOSRD
+preplace port FIXED_IO -pg 1 -lvl 4 -x 1350 -y 180 -defaultsOSRD
+preplace port cam_pclk -pg 1 -lvl 0 -x 0 -y 220 -defaultsOSRD
+preplace port cam_vsync -pg 1 -lvl 0 -x 0 -y 240 -defaultsOSRD
+preplace port cam_href -pg 1 -lvl 0 -x 0 -y 260 -defaultsOSRD
+preplace port cam_rst_n -pg 1 -lvl 4 -x 1350 -y 220 -defaultsOSRD
+preplace port cam_pwdn -pg 1 -lvl 4 -x 1350 -y 200 -defaultsOSRD
+preplace port cam_scl -pg 1 -lvl 4 -x 1350 -y 240 -defaultsOSRD
+preplace port cam_sda -pg 1 -lvl 4 -x 1350 -y 160 -defaultsOSRD
+preplace port lcd_hs -pg 1 -lvl 4 -x 1350 -y 300 -defaultsOSRD
+preplace port lcd_vs -pg 1 -lvl 4 -x 1350 -y 320 -defaultsOSRD
+preplace port lcd_de -pg 1 -lvl 4 -x 1350 -y 260 -defaultsOSRD
+preplace port lcd_bl -pg 1 -lvl 4 -x 1350 -y 280 -defaultsOSRD
+preplace port lcd_rst -pg 1 -lvl 4 -x 1350 -y 340 -defaultsOSRD
+preplace port lcd_pclk -pg 1 -lvl 4 -x 1350 -y 360 -defaultsOSRD
+preplace port led -pg 1 -lvl 4 -x 1350 -y 400 -defaultsOSRD
+preplace port uart_rxd -pg 1 -lvl 0 -x 0 -y 300 -defaultsOSRD
+preplace port uart_txd -pg 1 -lvl 4 -x 1350 -y 420 -defaultsOSRD
+preplace portBus cam_data -pg 1 -lvl 0 -x 0 -y 280 -defaultsOSRD
+preplace portBus lcd_rgb -pg 1 -lvl 4 -x 1350 -y 380 -defaultsOSRD
+preplace inst processing_system7_0 -pg 1 -lvl 2 -x 680 -y 100 -defaultsOSRD
+preplace inst rst_ps7_0_100M -pg 1 -lvl 3 -x 1130 -y 60 -defaultsOSRD
+preplace inst vision_top -pg 1 -lvl 1 -x 180 -y 230 -defaultsOSRD
+preplace netloc processing_system7_0_FCLK_CLK0 1 0 3 30 40 440 0 930
+preplace netloc processing_system7_0_FCLK_CLK1 1 0 3 20 -20 NJ -20 910
+preplace netloc processing_system7_0_FCLK_RESET0_N 1 2 1 950 40n
+preplace netloc rst_ps7_0_100M_peripheral_aresetn 1 0 4 30 430 NJ 430 NJ 430 1300
+preplace netloc cam_pclk_1 1 0 1 NJ 220
+preplace netloc cam_vsync_1 1 0 1 NJ 240
+preplace netloc cam_href_1 1 0 1 NJ 260
+preplace netloc cam_data_1 1 0 1 NJ 280
+preplace netloc vision_top_cam_rst_n 1 1 3 430J 220 NJ 220 NJ
+preplace netloc vision_top_cam_pwdn 1 1 3 420J 200 NJ 200 NJ
+preplace netloc vision_top_cam_scl 1 1 3 410J 240 NJ 240 NJ
+preplace netloc Net 1 1 3 400J -10 960J 170 1330J
+preplace netloc vision_top_lcd_hs 1 1 3 400J 260 NJ 260 1320J
+preplace netloc vision_top_lcd_vs 1 1 3 380J 270 NJ 270 1310J
+preplace netloc vision_top_lcd_de 1 1 3 390J 250 NJ 250 1330J
+preplace netloc vision_top_lcd_bl 1 1 3 370J 280 NJ 280 NJ
+preplace netloc vision_top_lcd_rst 1 1 3 360J 340 NJ 340 NJ
+preplace netloc vision_top_lcd_pclk 1 1 3 350J 360 NJ 360 NJ
+preplace netloc Net1 1 1 3 340J 380 NJ 380 NJ
+preplace netloc vision_top_led 1 1 3 330J 400 NJ 400 NJ
+preplace netloc uart_rxd_1 1 0 1 NJ 300
+preplace netloc vision_top_uart_txd 1 1 3 320J 420 NJ 420 NJ
+preplace netloc vision_top_M_AXI 1 1 1 NJ 100
+preplace netloc processing_system7_0_DDR 1 2 2 940J 160 1320J
+preplace netloc processing_system7_0_FIXED_IO 1 2 2 920J 180 NJ
+levelinfo -pg 1 0 180 680 1130 1350
+pagesize -pg 1 -db -bbox -sgen -140 -40 1490 440
+"
+}
+
