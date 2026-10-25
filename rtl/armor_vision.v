@@ -77,7 +77,7 @@ module armor_vision #(
     parameter [7:0] DROP_SCALE_DEF = 8'd255,
     parameter TACC_EN         = 1'b0  ,   // 多帧时域累积（默认关；开了灵敏度↑但要 20+ 个 BRAM）   // Q8 弹速修正：255 = 基准 20m/s
     //  ---- P4：时序跟踪 ----
-    parameter TRK_EN      = 1'b0       ,   // 默认关（保持原有逐帧行为）
+    parameter TRK_EN      = 1'b1       ,   // 默认关（保持原有逐帧行为）
     parameter GATE        = 96         ,   // 门控半径（像素）
     parameter HIT_N       = 2          ,
     parameter LOST_N      = 6          ,
@@ -617,6 +617,41 @@ always @(posedge clk or negedge rst_n) begin
     end
 end
 
+//-------------------------------------------------------
+// (9a-1) 帧级去抖：宽度 EMA + 最终瞄准点死区
+//   bond_w 由外框边缘决定，阈值附近 1~2 px 的闪烁会让
+//   aim_y = cy - bw*372/256 上下跳 1.5~3 px，静止时黄十字也在抖。
+//   这里每帧只更新一次：宽度做 alpha=1/8 的低通，最终瞄准点加 ±2 px 死区，
+//   把像素级抖动挡在云台/飞控外面。
+//-------------------------------------------------------
+reg  [AW:0]   bond_w_f;
+reg  [AW-1:0] fx_db, fy_db;
+reg           vsync_d1, vsync_d2, vsync_d3;
+wire          frame_tick_w = vsync_d2;   // 宽度采样：此时 bond_w 已是本帧值
+wire          frame_tick_a = vsync_d3;   // 瞄准点采样：等 ballistic 更新完
+wire signed [AW:0] dfx = $signed({1'b0, bl_fx}) - $signed({1'b0, fx_db});
+wire signed [AW:0] dfy = $signed({1'b0, bl_fy}) - $signed({1'b0, fy_db});
+
+always @(posedge clk or negedge rst_n) begin
+    if(!rst_n) begin
+        vsync_d1 <= 1'b0; vsync_d2 <= 1'b0; vsync_d3 <= 1'b0;
+        bond_w_f <= {(AW+1){1'b0}};
+        fx_db    <= {AW{1'b0}};
+        fy_db    <= {AW{1'b0}};
+    end
+    else begin
+        vsync_d1 <= vsync;
+        vsync_d2 <= vsync_d1;
+        vsync_d3 <= vsync_d2;
+        if(frame_tick_w)
+            bond_w_f <= bond_w_f - (bond_w_f >> 3) + (bond_w >> 3);
+        if(frame_tick_a) begin
+            if(dfx > 2 || dfx < -2) fx_db <= bl_fx;
+            if(dfy > 2 || dfy < -2) fy_db <= bl_fy;
+        end
+    end
+end
+
 assign bond_valid = bond_valid_r;
 assign center_x   = center_x_r;
 assign center_y   = center_y_r;
@@ -641,7 +676,7 @@ aim_predict #(
     .raw_valid (trk_on ? trk_valid : raw_valid),
     .cx        (trk_on ? trk_cx    : raw_cx   ),
     .cy        (trk_on ? trk_cy    : raw_cy   ),
-    .bw        (bond_w    ),
+    .bw        (bond_w_f  ),
     .aim_h_q8  (aim_h_eff ),
     .lead_q4   (lead_q4_eff),
     .lead_auto (rf_lead_auto[0]),
@@ -670,7 +705,7 @@ ballistic #(
     .vsync      (vsync      ),
     .en         (dist_on    ),
     .raw_valid  (raw_valid  ),
-    .bw         (bond_w     ),
+    .bw        (bond_w_f  ),
     .aim_h_q8   (aim_h_eff  ),
     .pcx        (pd_cx      ),
     .pcy        (pd_cy      ),
@@ -700,8 +735,8 @@ overlay_box #(
     .cy    (center_y  ),
     .ax    (aim_x     ),
     .ay    (aim_y     ),
-    .pvx   (bl_fx     ),   // 最终瞄准点（黄色十字，只在目标在动时画）
-    .pvy   (bl_fy     ),   //   = 预测灯心 + 几何偏移 + 下坠补偿
+    .pvx   (fx_db     ),   // 最终瞄准点（黄色十字，只在目标在动时画）
+    .pvy   (fy_db     ),   //   = 预测灯心 + 几何偏移 + 下坠补偿
     .ring_t(ring_t_eff),   // 注意：ring_t_eff 是 AW 位（窄了高位会悬空）
     .pv_on (pd_mov    ),
     .draw  (draw      ),
@@ -787,7 +822,7 @@ result_frame #(
     .cy         (center_y   ),
     .ax         (aim_x      ),
     .ay         (aim_y      ),
-    .bw         (bond_w     ),
+    .bw        (bond_w_f  ),
     .area       (blob_area  ),
     .fill_q8    (fill_q8    ),
     .blob_cnt   (blob_cnt   ),
@@ -803,8 +838,8 @@ result_frame #(
     .dist_ok    (bl_ok      ),
     .dist_cm    (bl_dist_cm ),
     .drop_px    (bl_drop_px ),
-    .fx         (bl_fx      ),
-    .fy         (bl_fy      ),
+    .fx         (fx_db      ),
+    .fy         (fy_db      ),
     .txd        (uart_txd   )
 );
 

@@ -431,7 +431,19 @@ function [VW-1:0] vabs;
 endfunction
 
 wire [VW:0] aspd     = {1'b0, vabs(vxn)} + {1'b0, vabs(vyn)};
-wire        moving_c = use_pred && (aspd >= MOVE_Q4);
+
+// 「在动」判定加迟滞：连续 3 帧 >= 4 px/帧 才置 1，连续 3 帧 < 2 px/帧 才清 0。
+// 原来单门限 2 px/帧 在静止时会随噪声来回跨，lead 时开时关 -> 黄十字一跳一跳。
+localparam [VW:0] MOVE_HI = 8'd64;   // 4.0 px/帧
+localparam [VW:0] MOVE_LO = 8'd32;   // 2.0 px/帧
+reg  [2:0] mov_on_cnt, mov_off_cnt;
+wire       mov_start = (aspd >= MOVE_HI);
+wire       mov_stop  = (aspd <  MOVE_LO);
+wire [2:0] on_cnt_n  = mov_start ? ((mov_on_cnt  == 3'd3) ? 3'd3 : mov_on_cnt  + 3'd1) : 3'd0;
+wire [2:0] off_cnt_n = mov_stop  ? ((mov_off_cnt == 3'd3) ? 3'd3 : mov_off_cnt + 3'd1) : 3'd0;
+wire       moving_c  = !use_pred ? 1'b0 :
+                       (moving ? !(mov_stop  && (off_cnt_n == 3'd3))
+                               :  (mov_start && (on_cnt_n  == 3'd3)));
 
 //-------------------------------------------------------
 // 帧末更新
@@ -450,6 +462,8 @@ always @(posedge clk or negedge rst_n) begin
         vy_q4 <= 16'sd0;
         pred_ok <= 1'b0;
         moving  <= 1'b0;
+        mov_on_cnt  <= 3'd0;
+        mov_off_cnt <= 3'd0;
     end
     else if(frame_end) begin
         cx_p <= cx;
@@ -471,6 +485,8 @@ always @(posedge clk or negedge rst_n) begin
 
         pred_ok <= use_pred;
         moving  <= moving_c;
+        mov_on_cnt  <= on_cnt_n;
+        mov_off_cnt <= off_cnt_n;
         vx_q4   <= vxn;
         vy_q4   <= vyn;
     end
