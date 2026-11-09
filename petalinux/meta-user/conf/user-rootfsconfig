@@ -3,3 +3,7 @@
 
 CONFIG_gpio-demo
 CONFIG_peekpoke
+
+# 本工程的 PL 驱动（out-of-tree 内核模块）
+CONFIG_video-manager
+CONFIG_pwm-6ch

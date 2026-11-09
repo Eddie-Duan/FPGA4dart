@@ -77,3 +77,30 @@ KDIR=$(shell cd ~/petalinux/2020.2 && echo $PWD)/components/yocto/workspace/sour
 7. `petalinux-build` → 出 `image.ub`
 8. `petalinux-package --boot --fsbl ... --fpga ... --u-boot --force` → 出 `BOOT.BIN`
 9. 跑完 `petalinux-build -x mrproper` 回收 20–30 GB
+
+## 已补的驱动 recipe（2026-11-09）
+
+原工程的两个驱动是靠手工 `make` 编 `.ko`，Makefile 里 `KDIR` 写死成别人的路径，无法复现。已改成标准 Yocto 模块 recipe：
+
+```
+meta-user/recipes-apps/
+├── video-manager/
+│   ├── video-manager.bb          # inherit module
+│   └── files/{video_manager.c, test_app.c, Makefile}
+└── pwm-6ch/
+    ├── pwm-6ch.bb
+    └── files/{pwm_6ch.c, Makefile}
+```
+
+- `Makefile` 已改成用 `$(KERNEL_SRC)`（Yocto 注入），不再写死路径
+- `LICENSE = "CLOSED"`：规避 GPL 校验和的版本差异，内部驱动用这个最稳
+- `user-rootfsconfig` 里已加 `CONFIG_video-manager` / `CONFIG_pwm-6ch`，否则 `petalinux-config` 的 rootfs 菜单看不到
+
+**设备树必须同时补节点**，否则 `.ko` 加载后 probe 不到（驱动靠 of_match 匹配）：
+
+| 驱动 | compatible | 设备树里要有 |
+|---|---|---|
+| video_manager | `xlnx,video-manager-1.0` | PL 里实例名对应节点（原 dart 用 `video_mameger_1`，注意拼写） |
+| pwm_6ch | `xlnx,pwm-6ch-1.0` | PL 里 PWM IP 的节点 |
+
+`test_app.c` 目前只随 recipe 打包源文件，没有编成可执行程序——需要的话加一个 `video-manager-test` 的用户态 recipe（`inherit` 默认即可，直接 `oe_runmake`）。

@@ -52,3 +52,8 @@ desktop.ini
 # 本机维护脚本与日志（不属于工程内容）
 _cleanup_log.txt
 c_cleanup_admin.ps1
+
+# PetaLinux 构建产物（可从工程重新生成）
+petalinux/out/
+BOOT.BIN
+image.ub

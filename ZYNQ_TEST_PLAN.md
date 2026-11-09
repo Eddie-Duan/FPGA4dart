@@ -185,8 +185,8 @@ GIC → 驱动 `tasklet` 读寄存器 → `kfifo` → `waitqueue` → 用户态 
 
 | # | 测什么 | 怎么做 | 通过判据 |
 |---|---|---|---|
-| D1 | PetaLinux 2020.2 环境 | Ubuntu 18.04/20.04 VM（本机有 VMware）安装 PetaLinux 2020.2（与 Vivado/Vitis 2020.2 同版本） | `petalinux-util --version` 正常；能 `petalinux-create` 出工程 |
-| D2 | 工程基于 7020 的 XSA 建起来 | `petalinux-config --get-hw-description=<XSA>`；**可直接借用 dart 的 `dart_-linux/project-spec/meta-user/` 里的配方**（驱动 recipe、设备树片段、U-Boot 配置） | 生成 BOOT.BIN + image.ub；串口登录 root |
+| D1 | PetaLinux 2020.2 环境 | Ubuntu 18.04.6 VM（`D:\DUANboyang\VMs\ubuntu1804_petalinux`）**已装好 PetaLinux 2020.2**（`~/petalinux`，9.2 GB，`--platform arm`） | ✅ 2026-11-09：`petalinux-create` 正常，`petalinux-util` 可用 |
+| D2 | 工程基于 7020 的 XSA 建起来 | `petalinux-config --get-hw-description=<XSA>`；**可直接借用 dart 的 `dart_-linux/project-spec/meta-user/` 里的配方**（驱动 recipe、设备树片段、U-Boot 配置） | ✅ 2026-11-09：`petalinux-build` 50 分钟零错误，出 `image.ub` 11 MB + `BOOT.BIN` 4.7 MB；⬜ 串口登录 root 待上板验证 |
 | D3 | 自研驱动：`video_manager` | 移植 dart 的 `video_manager.c`（中断 → tasklet 读寄存器 → kfifo → 唤醒队列）到本工程的寄存器映射 | `/dev/video_manager` 出现；`ioctl` 五个命令全部可用；`read()` 阻塞/非阻塞都对 |
 | D4 | 自研驱动：`pwm_6ch` | 直接复用 dart 的 IP + 驱动（sysfs 属性） | `/sys/.../ch0_{arr,cmp,en}` 可读写；示波器看到周期/占空比跟着变 |
 | D5 | 设备树 | 加 `pl-custom.dtsi` 节点：`video_manager`（含 `interrupts`）、`pwm_6ch`、SPI（spidev）、I2C、VDMA/vcap | `dmesg` 里 probe 成功；`/proc/interrupts` 里能看到中断计数在涨 |

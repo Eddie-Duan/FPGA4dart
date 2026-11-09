@@ -200,6 +200,11 @@ VM 已建好（2026-11-07）：`D:\DUANboyang\VMs\ubuntu1804_petalinux\ubuntu180
 100 GB thin / 8 GB 内存 / 4 核 / NAT。ISO 在 `D:\DUANboyang\VMs\iso\ubuntu-18.04.6-desktop-amd64.iso`，
 sha256 `f730be58…ff11` 与官方 SHA256SUMS 一致。装完系统后跑 `doc/petalinux_1804_setup.sh` 装依赖。
 
+**2026-11-09 已装好**：PetaLinux 2020.2 装在 `~/petalinux`（9.2 GB，`--platform arm` 只装 zynq）。
+首次构建 `dart_7020` 工程（XSA = 10/18 的 PL-only 版，`xc7z020clg400-2`）：
+`petalinux-build` 50 分钟、0 错误 → `image.ub` 11 MB；`petalinux-package --boot` → `BOOT.BIN` 4.7 MB。
+产物已拉回主机 `petalinux/out/`。**串口上板验证待做**（D2 的判据只完成了一半）。
+
 ### B.2 步骤
 
 1. VMware 建 Ubuntu 18.04.6 桌面版，100 GB 盘；装 `build-essential`、`zlib1g:i386`、
