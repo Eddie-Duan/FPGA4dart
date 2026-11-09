@@ -1,5 +1,5 @@
 # ============================================================
-#  Vivado 产生的文件（可由 rtl/ sim/ prj/*.srcs/ 重新产生）
+#  Vivado 生成物（可由 rtl/ sim/ prj/*.srcs/ 重新生成）
 # ============================================================
 prj/ov5640_lcd.gen/
 prj/ov5640_lcd.runs/
@@ -19,6 +19,9 @@ prj/zynq_vision/zynq_vision.ip_user_files/
 prj/zynq_vision/zynq_vision.srcs/sources_1/bd/system/ip/
 prj/zynq_vision/ip/*/
 prj/zynq_vision/.Xil/
+
+# Block Design 自动生成的二进制档案
+prj/**/*.bda
 
 # Vivado 执行记录 / 产物
 *.jou
@@ -45,3 +48,7 @@ sim/xsim.dir/
 Thumbs.db
 desktop.ini
 *~
+
+# 本机维护脚本与日志（不属于工程内容）
+_cleanup_log.txt
+c_cleanup_admin.ps1
