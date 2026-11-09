@@ -1,0 +1,285 @@
+#include "dt-bindings/gpio/gpio.h"
+#include "dt-bindings/input/linux-event-codes.h"
+/ {
+    model = "DC";
+	chosen {
+		bootargs = "console=ttyPS0,115200 earlyprintk root=/dev/mmcblk0p2 rw rootwait debug";
+		stdout-path = "serial0:115200n8";
+	};
+
+    usb_phy0: phy0@e0002000 {
+		compatible = "ulpi-phy";
+		#phy-cells = <0>;
+		reg = <0xe0002000 0x1000>;
+		view-port = <0x0170>;
+		drv-vbus;
+	};
+    cam_clk_24mhz: cam_clk_24mhz {
+                compatible = "fixed-clock";
+                #clock-cells = <0>;
+                clock-frequency = <24000000>; /* 24MHz */
+                clock-output-names = "cam_clk_24mhz";
+    };
+	/* OV9282 专用固定电源：DOVDD 2.8V（数字I/O电压） */
+    ov9282_dovdd_2v8: regulator-ov9282-dovdd {
+        compatible = "regulator-fixed";  // 固定电压稳压器标识
+        regulator-name = "OV9282_DOVDD_2V8";  // 电源名称（便于调试）
+        regulator-min-microvolt = <2800000>;  // 最小电压：2.8V（转换为微伏）
+        regulator-max-microvolt = <2800000>;  // 最大电压：2.8V（固定电压，与最小一致）
+        regulator-boot-on;  // 系统启动时自动使能该电源
+        regulator-always-on;  // 电源持续使能，避免摄像头掉电
+    };
+
+    /* OV9282 专用固定电源：AVDD 2.8V（模拟电压） */
+    ov9282_avdd_2v8: regulator-ov9282-avdd {
+        compatible = "regulator-fixed";
+        regulator-name = "OV9282_AVDD_2V8";
+        regulator-min-microvolt = <2800000>;
+        regulator-max-microvolt = <2800000>;
+        regulator-boot-on;
+        regulator-always-on;
+    };
+
+    /* OV9282 专用固定电源：DVDD 1.5V（数字核心电压） */
+    ov9282_dvdd_1v5: regulator-ov9282-dvdd {
+        compatible = "regulator-fixed";
+        regulator-name = "OV9282_DVDD_1V5";
+        regulator-min-microvolt = <1500000>;  // 1.5V转换为微伏
+        regulator-max-microvolt = <1500000>;
+        regulator-boot-on;
+        regulator-always-on;
+    };
+    leds {
+        compatible = "gpio-leds";
+        
+        /* 第一个LED，使用GPIO0的第0个引脚 */
+        led0 {
+            label = "led0";
+            gpios = <&axi_gpio_0 0 0 0>;  /* bank 0, 引脚0, 激活电平0 */
+            linux,default-trigger = "heartbeat"; /* 可选：心跳效果 */
+            max-brightness = <1>;
+	    default-state = "on";
+        };
+        
+        /* 第二个LED，使用GPIO0的第1个引脚 */
+        led1 {
+            label = "led1";
+            gpios = <&axi_gpio_0 1 0 0>;  /* bank 0, 引脚1, 激活电平0 */
+            linux,default-trigger = "mmc1"; /* 可选：心跳效果 */
+	    max-brightness = <1>;
+            default-state = "on";
+        };
+    };
+};
+
+// 1. 定义 pinctrl 控制器节点
+// 注意：此节点可能已在你的设备树中存在，通常由硬件设计工具（如Vivado）生成。
+// 你需要检查是否已包含，如果已存在，则只需添加第2部分的子节点。
+//&slcr { // 假设 slcr 是 SLCR（系统级控制寄存器）的节点标签
+//    pinctrl0: pinctrl@700 {
+//        compatible = "xlnx,pinctrl-zynq"; // 必须的兼容性字符串[citation:1]
+//        reg = <0x700 0x200>;             // 在 SLCR 中的偏移和长度[citation:1]
+//        syscon = <&slcr>;                // 指向 SLCR 的 phandle[citation:1]
+        // 注意：`syscon` 属性在部分内核版本/代码中可能非必需，请根据你的内核实际情况决定是否添加。
+
+        // 2. 定义 I2C0 的引脚配置子节点
+        // 此节点的标签（`pinctrl_i2c0_default`）将用于被 I2C 控制器引用。
+        //pinctrl_i2c0_default: i2c0-default {
+        //    // 配置 MIO10 和 MIO11 为 I2C0 功能
+        //    mux {
+        //        groups = "i2c0_0_grp"; // 使用引脚组
+        //        function = "i2c0";     // 功能为 I2C0[citation:1]
+        //    };
+            // 配置引脚的电气参数（可选，但推荐设置以稳定通信）
+        //    conf {
+        //        groups = "i2c0_0_grp";
+        //        slew-rate = <0>;       // 压摆率：0-慢，1-快。I2C建议用慢速（0）
+        //        io-standard = <3>;     // IO电平标准：1-LVCMOS18, 2-LVCMOS25, 3-LVCMOS33[citation:1]
+        //        bias-pull-up;          // 使能内部上拉（I2C总线通常需要上拉）
+        //    };
+        //};
+	//pinctrl_sdio1_default: sdio1-default {
+	//mux {
+       	// 根据你的驱动源码，MIO46-51对应的组名为 'sdio1_3_grp'
+       	//	groups = "sdio1_3_grp";
+        //	function = "sdio1"; // 功能选择为 sdio1
+    	//	};
+    	//conf {
+        //	groups = "sdio1_3_grp";
+        	// 配置电气参数（参数值根据你的硬件需求调整）
+        //	slew-rate = <0>;       // 压摆率：0-慢，1-快
+        //	io-standard = <3>;     // IO电平标准：3-LVCMOS33
+        	// bias-pull-up;       // 如需内部上拉，取消注释此行
+    	//	};
+	//};
+//    };
+//};
+
+// 3. 将引脚配置应用到 I2C0 控制器
+// 找到你的 I2C0 控制器节点（通常是 i2c@e0004000），并添加 pinctrl 引用。
+//&i2c0 { // 使用控制器节点的标签
+//    status = "okay";
+//    clock-frequency = <100000>; // 设置 I2C 总线频率为 100kHz
+//    pinctrl-names = "default";  // 状态名称
+//    pinctrl-0 = <&pinctrl_i2c0_default>; // 引用上面定义的引脚配置
+    // ... 其他配置，如从设备地址等
+//};
+
+&i2c0 {
+	clock-frequency = <100000>;
+
+    ov9282: camera@60 {
+        compatible = "ovti,ov9282";
+        reg = <0x60>;
+        /* Use 64MHz XCLK for OV9282 DVP operation */
+        clocks = <&cam_clk_24mhz>;
+        clock-names = "xclk";
+        /* Supply property names expected by many OV sensors/drivers */
+        dovdd-supply = <&ov9282_dovdd_2v8>;  // 数字I/O：2.8V
+        avdd-supply = <&ov9282_avdd_2v8>;    // 模拟电压：2.8V
+        dvdd-supply = <&ov9282_dvdd_1v5>;    // 数字核心：1.5V
+        port {
+            camera_out: endpoint {
+                remote-endpoint = <&vcap_in>;
+                bus-type    = <5>;
+                /* DVP 10-bit */
+                bus-width   = <10>;
+                /* Keep signal polarities and sample edge as before */
+                hsync-active = <0>;
+                vsync-active = <0>;
+                pclk-sample  = <1>;
+            };
+        };
+    };
+};
+
+&amba_pl {
+	/* 视频捕获设备 - 连接Camera到VDMA的S2MM通道 */
+    vcap {
+        compatible = "xlnx,video";
+        dmas = <&axi_vdma_0 1>;  
+        dma-names = "port0";
+
+        ports {
+            #address-cells = <1>;
+            #size-cells = <0>;
+                port@0 {
+                reg = <0>;
+                direction = "input";
+                vcap_in: endpoint {
+                    remote-endpoint = <&camera_out>;
+                    /* Match OV9282 DVP 10-bit */
+                    bus-width = <10>;
+		    bus-type    = <5>;
+                };
+            };
+        };
+	};
+};
+
+/* SPI devices: BMI088 on spi0, ADXL372 on spi1 */
+&axi_quad_spi_0 {
+   status = "okay";
+
+    spidev0@0 {
+         compatible = "spidev";
+         reg = <0>;
+         spi-max-frequency = <10000000>;
+     };
+
+    spidev1@1 {
+         compatible = "spidev";
+         reg = <1>;
+         spi-max-frequency = <10000000>;
+     };
+    /* BMI088 IMU attached to SPI chip-select 0 */
+//    bmi088_accel@0 {
+//        compatible = "bosch,bmi088-accel";
+//        reg = <0>;
+        /* Typical supported SPI frequency; adjust if needed */
+//        spi-max-frequency = <10000000>;
+//	spi-cpol;
+//        spi-cpha;
+//        status = "okay";
+//    };
+//    bmi088_gyro@1 {
+//        compatible = "bosch,bmi088-gyro";
+//        reg = <1>; /* CS 编号 */
+//        spi-max-frequency = <10000000>;
+//        spi-cpol;
+//        spi-cpha;
+//        status = "okay";
+//    };
+};
+
+
+&axi_quad_spi_1 {
+    status = "okay";
+
+    spidev2@0 {
+         compatible = "spidev";
+         reg = <0>;
+         spi-max-frequency = <10000000>;
+     };
+
+    /* ADXL372 accelerometer attached to SPI chip-select 0 */
+//    adxl372@0 {
+//        compatible = "adi,adxl372";
+//        reg = <0>;
+//        spi-max-frequency = <20000000>;
+//        status = "okay";
+//    };
+};
+
+&video_mameger_1{
+	interrupt-names = "vid2intc_irpt";
+        interrupt-parent = <&intc>;
+        interrupts = <0 29 1>;
+};
+
+&pinctrl0 {
+	sdio1_default: sdio1-default {
+            mux {
+                groups = "sdio1_3_grp";
+                function = "sdio1";
+            };
+
+            conf {
+                groups = "sdio1_3_grp";
+                bias-pull-up;
+                low-power-enable;
+		};
+        };
+	sdio1_cd_default: sdio1-cd-default{
+		mux {
+      			groups = "sdio1_emio_cd";
+      			function = "sdio1_cd";
+    		};
+		conf {
+			groups = "sdio1_emio_cd";
+			low-power-enable;
+		};
+	};
+};
+&sdhci1 {
+//    /* SDIO专用配置 */
+    bus-width = <4>;                    /* 4位数据总线 */
+    max-frequency = <50000000>;         /* 最大50MHz */
+    non-removable;                      /* 非可移除设备 */
+    xlnx,mio-bank = <1>;
+//    xlnx,fails-without-test-cd;
+    broken-cd;
+    keep-power-in-suspend;
+//    cap-sd-highspeed;                   /* 支持高速SD */
+//    cap-mmc-highspeed;                  /* 支持高速MMC */
+//    cap-sdio-irq;                       /* 支持SDIO中断 */
+    disable-wp;                         /* 禁用写保护检测 */
+    pinctrl-names = "default";
+    pinctrl-0 = <&sdio1_default>;
+//   
+};
+
+//&axi_bram_ctrl_0{
+//	compatible = "generic-uio";
+//}
+

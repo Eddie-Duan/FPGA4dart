@@ -113,7 +113,9 @@ module armor_vision #(
     output     [AW-1:0]  center_x   ,   // 灯圆心 x
     output     [AW-1:0]  center_y   ,   // 灯圆心 y
     output     [AW-1:0]  aim_x      ,   // 瞄准点 x（= 圆心 x）
-    output     [AW-1:0]  aim_y          // 瞄准点 y（比圆心往上偏一点）
+    output     [AW-1:0]  aim_y,          // 瞄准点 y（比圆心往上偏一点）
+    output     [143:0] result_extra ,   // A 线：打包结果给 AXI-Lite
+    output             frame_tick_o     // A 线：帧末单拍脉冲
 );
 
 //localparam define
@@ -917,5 +919,29 @@ assign led[0] = ~((st_page != 2'd0) ? pd_ok  : (sel == 2'd0));
 assign led[1] = ~((st_page != 2'd0) ? pd_mov : (sel == 2'd1));
 assign led[2] = ~((st_page != 2'd0) ? bl_ok  : (sel == 2'd2));
 assign led[3] = ~(bond_valid ? 1'b1 : hb);
+
+
+//-------------------------------------------------------
+// (16) A 线：把结果打包给 AXI-Lite 寄存器文件（PS 侧读取）
+//     布局必须与 rtl/ov5640_lcd_zynq.v 的例化保持一致：
+//       [10:0] bw      [42:11] area     [58:43] dist_cm  [74:59] drop_px
+//       [90:75] vx_q4  [106:91] vy_q4   [116:107] px     [126:117] py
+//       [134:127] fill_q8  [137:135] blob_cnt  [143:138] flags
+//     纯连线，不参与判决，7A35T 工程不连接这两个输出也不受影响。
+//-------------------------------------------------------
+assign frame_tick_o = st_frame_tick;
+assign result_extra = {
+    bond_w_f,                                             // [10:0]
+    blob_area,                                            // [42:11]
+    bl_dist_cm,                                           // [58:43]
+    bl_drop_px,                                           // [74:59]
+    pd_vx,                                                // [90:75]
+    pd_vy,                                                // [106:91]
+    pd_cx,                                                // [116:107]
+    pd_cy,                                                // [126:117]
+    fill_q8,                                              // [134:127]
+    blob_cnt,                                             // [137:135]
+    {disp_bin, raw_far, pd_mov, pd_ok, adapt_ok, bl_ok}   // [143:138]
+};
 
 endmodule

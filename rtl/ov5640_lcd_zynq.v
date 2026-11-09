@@ -144,7 +144,56 @@ module ov5640_lcd_zynq (
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI RLAST" *)
     input          m_axi_rlast   ,
     (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 M_AXI RREADY" *)
-    output         m_axi_rready
+        output         m_axi_rready  ,
+
+    // ------------------------------------------------------------------
+    // A 线：AXI4-Lite 从口 -> PS 的 M_AXI_GP0（视觉结果寄存器 + 帧中断）
+    //   时钟域 = UI_CLK（FCLK_CLK0 100 MHz），复位 = rst_n（PS 复位）
+    // ------------------------------------------------------------------
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI AWADDR",
+       X_INTERFACE_PARAMETER = "XIL_INTERFACENAME S_AXI, PROTOCOL AXI4LITE, DATA_WIDTH 32, ADDR_WIDTH 8, FREQ_HZ 100000000, READ_WRITE_MODE READ_WRITE, HAS_BURST 0, HAS_LOCK 0, HAS_PROT 1, HAS_CACHE 0, HAS_QOS 0, SUPPORTS_NARROW_BURST 0" *)
+    input  [7:0]   s_axi_awaddr  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI AWPROT" *)
+    input  [2:0]   s_axi_awprot  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI AWVALID" *)
+    input          s_axi_awvalid ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI AWREADY" *)
+    output         s_axi_awready ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI WDATA" *)
+    input  [31:0]  s_axi_wdata   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI WSTRB" *)
+    input  [3:0]   s_axi_wstrb   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI WVALID" *)
+    input          s_axi_wvalid  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI WREADY" *)
+    output         s_axi_wready  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI BRESP" *)
+    output [1:0]   s_axi_bresp   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI BVALID" *)
+    output         s_axi_bvalid  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI BREADY" *)
+    input          s_axi_bready  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI ARADDR" *)
+    input  [7:0]   s_axi_araddr  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI ARPROT" *)
+    input  [2:0]   s_axi_arprot  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI ARVALID" *)
+    input          s_axi_arvalid ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI ARREADY" *)
+    output         s_axi_arready ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI RDATA" *)
+    output [31:0]  s_axi_rdata   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI RRESP" *)
+    output [1:0]   s_axi_rresp   ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI RVALID" *)
+    output         s_axi_rvalid  ,
+    (* X_INTERFACE_INFO = "xilinx.com:interface:aximm:1.0 S_AXI RREADY" *)
+    input          s_axi_rready  ,
+
+    // A 线：帧末中断 -> PS 的 IRQ_F2P（经 xlconcat）
+    (* X_INTERFACE_INFO = "xilinx.com:signal:interrupt:1.0 irq INTERRUPT",
+       X_INTERFACE_PARAMETER = "XIL_INTERFACENAME irq, SENSITIVITY LEVEL_HIGH, PortWidth 1" *)
+    output         irq
 );
 
 //--------------------------------------------------------------------------
@@ -183,6 +232,9 @@ wire  [3:0]  vision_led;
 wire  [5:0]  seg_sel;
 wire  [7:0]  seg_led;
 wire         vision_bond_valid;
+wire  [9:0]  vision_cx, vision_cy, vision_ax, vision_ay;
+wire  [143:0] vision_res_extra;
+wire         vision_frame_tick;
 wire         axi_error;
 
 assign sys_init_done = startup_delay_done;
@@ -347,12 +399,67 @@ armor_vision u_armor_vision (
     .seg_sel    (seg_sel         ),
     .seg_led    (seg_led         ),
     .bond_valid (vision_bond_valid),
-    .center_x   (                ),
-    .center_y   (                ),
-    .aim_x      (                ),
-    .aim_y      (                ),
+    .center_x   (vision_cx        ),
+    .center_y   (vision_cy        ),
+    .aim_x      (vision_ax        ),
+    .aim_y      (vision_ay        ),
+    .result_extra (vision_res_extra),
+    .frame_tick_o (vision_frame_tick),
     .uart_rxd   (uart_rxd        ),
     .uart_txd   (uart_txd        )
     );
+
+
+//--------------------------------------------------------------------------
+// A 线第一阶段：AXI4-Lite 结果寄存器 + 帧末中断
+//   - AXI 侧走 ui_clk（FCLK_CLK0 100 MHz），视觉侧走 lcd_clk（25 MHz）
+//   - 每帧把结果快照锁存一次，用 toggle 同步到 AXI 域，PS 读到的是整帧一致的数
+//   - irq 是电平：IRQ_STATUS 由 PS 写 1 清零（W1C），与 dart 的驱动约定一致
+//--------------------------------------------------------------------------
+vision_regs_axi #(
+    .SEC_CYCLES (100_000_000)          // 1 s @ FCLK_CLK0 = 100 MHz
+) u_vision_regs_axi (
+    .s_axi_aclk    (ui_clk                    ),
+    .s_axi_aresetn (rst_n                     ),
+    .s_axi_awaddr  (s_axi_awaddr              ),
+    .s_axi_awprot  (s_axi_awprot              ),
+    .s_axi_awvalid (s_axi_awvalid             ),
+    .s_axi_awready (s_axi_awready             ),
+    .s_axi_wdata   (s_axi_wdata               ),
+    .s_axi_wstrb   (s_axi_wstrb               ),
+    .s_axi_wvalid  (s_axi_wvalid              ),
+    .s_axi_wready  (s_axi_wready              ),
+    .s_axi_bresp   (s_axi_bresp               ),
+    .s_axi_bvalid  (s_axi_bvalid              ),
+    .s_axi_bready  (s_axi_bready              ),
+    .s_axi_araddr  (s_axi_araddr              ),
+    .s_axi_arprot  (s_axi_arprot              ),
+    .s_axi_arvalid (s_axi_arvalid             ),
+    .s_axi_arready (s_axi_arready             ),
+    .s_axi_rdata   (s_axi_rdata               ),
+    .s_axi_rresp   (s_axi_rresp               ),
+    .s_axi_rvalid  (s_axi_rvalid              ),
+    .s_axi_rready  (s_axi_rready              ),
+    .res_clk       (lcd_clk                   ),
+    .res_rst_n     (rst_n                     ),
+    .frame_tick    (vision_frame_tick         ),
+    .valid         (vision_bond_valid         ),
+    .cx            (vision_cx                 ),
+    .cy            (vision_cy                 ),
+    .ax            (vision_ax                 ),
+    .ay            (vision_ay                 ),
+    .bw            (vision_res_extra[10:0]    ),
+    .area          (vision_res_extra[42:11]   ),
+    .dist_cm       (vision_res_extra[58:43]   ),
+    .drop_px       (vision_res_extra[74:59]   ),
+    .vx_q4         (vision_res_extra[90:75]   ),
+    .vy_q4         (vision_res_extra[106:91]  ),
+    .px            (vision_res_extra[116:107] ),
+    .py            (vision_res_extra[126:117] ),
+    .fill_q8       (vision_res_extra[134:127] ),
+    .blob_cnt      (vision_res_extra[137:135] ),
+    .flags         (vision_res_extra[143:138] ),
+    .irq           (irq                      )
+);
 
 endmodule
