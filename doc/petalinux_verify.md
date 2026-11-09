@@ -27,8 +27,9 @@ grep -cE 'amba_pl|axi_' /tmp/sys.dts                        # PL 节点数（0 =
 grep -E 'video-manager|pwm-6ch|opencv|gstreamer' images/linux/rootfs.manifest
 
 # 4. 驱动模块是否编出来
-find images/linux -name '*.ko' | head
-find components/yocto -name 'video_manager.ko' -o -name 'pwm_6ch.ko' | head
+find build -name 'video_manager.ko' -o -name 'pwm_6ch.ko' | head
+grep -E 'video-manager|pwm-6ch' images/linux/rootfs.manifest
+zcat images/linux/rootfs.cpio.gz | cpio -it 2>/dev/null | grep -E 'video_manager\.ko|pwm_6ch\.ko'
 
 # 5. BOOT.BIN 的分区构成（FSBL / bit / uboot 各一段）
 bootgen -arch zynq -image boot.bif -o /dev/null 2>&1 | head -5
@@ -53,6 +54,24 @@ bootgen -arch zynq -image boot.bif -o /dev/null 2>&1 | head -5
 >
 > 将来接 PL 有两条路：① 把 PL IP 打包成 Vivado IP（带 device-tree 元数据），Vivado 自动生成节点；② 手写 `pl-custom.dtsi`，自己给 `compatible` + `reg`（驱动要靠它 probe）。**我们的 `video_manager` / `pwm_6ch` 走第 ② 条。**
 
+### 驱动编译实测（2026-11-09）— ✅ 通过
+
+把 `petalinux/meta-user/recipes-apps/{video-manager,pwm-6ch}` 拷进工程、在 `project-spec/configs/rootfs_config` 里加 `CONFIG_video-manager=y` / `CONFIG_pwm-6ch=y`，增量编译结果：
+
+```
+Tasks Summary: Attempted 3561 tasks of which 3096 didn't need to be rerun and all succeeded.
+[INFO] Successfully built project
+```
+
+| 检查 | 结果 |
+|---|---|
+| 编译产物 | `build/tmp/sysroots-components/zynq_generic/{pwm-6ch,video-manager}/lib/modules/5.4.0-xilinx-v2020.2/extra/*.ko` |
+| rootfs 包 | `kernel-module-video-manager-5.4.0-xilinx-v2020.2`、`kernel-module-pwm-6ch-5.4.0-xilinx-v2020.2` 都在 manifest 里 |
+| 镜像内文件 | `lib/modules/5.4.0-xilinx-v2020.2/extra/video_manager.ko`、`pwm_6ch.ko` |
+| `BOOT.BIN` | 重新打包成功（4.7 MB） |
+
+**这证明 recipe 是对的、能编进 rootfs。** 但 `.ko` 现在装了也 probe 不到——设备树里没有对应节点（见上一条）。等 PL 加 IP、补了 `pl-custom.dtsi` 才生效。
+
 ---
 
 ## 第 2 层：模拟级（不需要板子，能验证"Linux 能不能起来"）
@@ -70,6 +89,25 @@ petalinux-boot --qemu --kernel        # 起内核，看是否到 shell
 - 能进到登录提示符，root 能登（密码在 `petalinux-config` 里设的）
 
 **局限**：qemu 的 zynq 模型只有 PS，**PL 和自定义 IP 完全不模拟**，所以驱动 probe、VDMA、中断这些都验不了。
+
+### 基线实测（2026-11-09）— ✅ 通过
+
+```
+Booting Linux on physical CPU 0x0
+Freeing unused kernel memory: 1024K
+dropbear.                                   ← SSH 服务启动
+Starting syslogd/klogd: done
+Starting tcf-agent: OK
+PetaLinux 2020.2 dart_7020 /dev/ttyPS0
+dart_7020 login:                            ← 到达登录符
+```
+
+**这证明了**：内核配置正确、dtb 能被解析、initramfs 挂载成功、init 系统跑通、dropbear/inetd/syslogd/tcf-agent 都能启动、串口控制台正常。
+
+**这没证明**：真实 PS 外设（SD 卡、网口）、PL 逻辑、中断通路、DDR 实际容量、时钟树——这些必须上板。
+
+> 注：`petalinux-boot --qemu` 用的是 Petalinux 自带的 `qemu-system-aarch64`，
+> 系统里 `which qemu-system-arm` 报 MISSING 不影响。
 
 ---
 
