@@ -1,0 +1,10 @@
+# compile verilog/system verilog design source files
+verilog xil_defaultlib  \
+"../../../../../../../比较器代码/comp_4/TEMPLATE_COMP_4.v" \
+"../../../../../../../比较器代码/comp_4/Test_comp_4.v" \
+
+# compile glbl module
+verilog xil_defaultlib "glbl.v"
+
+# Do not sort compile order
+nosort
