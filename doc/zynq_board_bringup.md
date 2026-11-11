@@ -132,7 +132,53 @@ rootfs 用分区 2 的 ext4。）
 
 ## 九、待办
 
-- [ ] 用我们自己的 `system.bit` 替换卡上的厂商 bitstream
+- [x] 用我们自己的 `system.bit` 替换卡上的厂商 bitstream
 - [ ] 修好我们自己的 BOOT.BIN（PS7 配置对齐后重做）
 - [ ] PL 侧补 IP（VDMA/SPI/PWM/video_manager）→ 新 XSA → 设备树加节点 → 驱动 probe
 - [ ] 板级验证清单见 `doc/petalinux_verify.md`
+
+## 十、换上我们自己的 bitstream 后实测（2026-11-11）
+
+把 `images/linux/system.bit`（`vision_top` 设计）写入卡的同一个文件名，U-Boot
+`bootcmd` 不用改，上电自动加载。
+
+**四个 LED 全部观察一遍**（板上有 PW / DONE / PS / PL 四个灯）：
+
+| LED | 状态 | 含义 |
+|---|---|---|
+| PW | 亮 | 电源正常 |
+| **DONE** | **亮** | **我们的 bitstream 加载成功**（FPGA 配置完成） |
+| **PS** | **亮** | PS 侧系统运行中 |
+| **PL** | **闪烁** | **PL 逻辑在跑**（有独立时钟，用户逻辑生效） |
+
+**结论：我们的 PS7 配置、bitstream、内核、rootfs 在真板子上全部正常工作。**
+
+LCD 仍然没有画面。这不是启动问题，属于设计层面，可能原因：
+
+1. `vision_top` 需要摄像头输入才有输出（摄像头是否接入/供电）
+2. `vision_top` 内部没有 LCD 驱动模块（那 LCD 本来就是黑的）
+3. LCD 排线/背光供电
+
+判据：在 Vivado 里打开 `vision_top` 的端口定义，确认它是否有 LCD 相关输出
+（`lcd_*` / `hsync` / `vsync` / `rgb*` 等）。没有的话 LCD 黑屏是正常的。
+
+## 十一、串口 USB 链路的已知问题
+
+调试过程中 CH340 多次出现：
+- `usb 2-2.1: failed to send control message: -110`（ETIMEDOUT）
+- 打开 `/dev/ttyUSB0` 报 `Input/output error`
+- 板子断电时整条 USB 链路掉线，需要重新连进虚拟机
+
+处理办法：在虚拟机里重新绑定 USB 设备即可恢复
+
+```bash
+p=$(ls -d /sys/bus/usb/devices/*/ | while read d; do \
+      [ -e "$d/idVendor" ] && [ "$(cat $d/idVendor)" = "1a86" ] && basename $d; done | head -1)
+echo -n "$p" > /sys/bus/usb/drivers/usb/unbind && sleep 2
+echo -n "$p" > /sys/bus/usb/drivers/usb/bind
+```
+
+如果频繁发生，优先怀疑 **USB 线 / USB 口供电或接触**（这块板子靠 USB 供电，
+Zynq + LCD 峰值电流可能超过普通 USB 口的 500 mA）。建议用后置 USB 3.0 口，
+或改用板子的独立 DC 供电口。
+
