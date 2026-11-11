@@ -304,3 +304,48 @@ date            = 2026/11/11  13:55:16
 3. LCD/摄像头功能验证
 4. 补 XDC 约束（消除 `no_clock` 90 处、`unconstrained_internal_endpoints` 226 处等警告）
 
+## 十五、**PS + PL 协同工作已达成**（2026-11-11 16:05）
+
+把 `bootcmd` 改回"先加载 bitstream"后，上电启动日志：
+
+```
+design filename = "system2_wrapper;UserID=0XFFFFFFFF;Version=2020.2"
+part number = "7z020clg400"
+...
+axi_gpio <addr:0x41200000>          ← 关键关卡通过（此前必挂）
+Alientek LCD ID: 0                  ← 从 PL 的 AXI 从设备读到了数据
+Starting kernel ...
+```
+
+板载四个 LED 的状态：
+
+| LED | 状态 | 含义 |
+|---|---|---|
+| PW | 常亮 | 供电正常 |
+| **DONE** | **常亮** | FPGA 配置成功（我们的 bitstream） |
+| **PS** | **常亮** | PS 侧内核运行中 |
+| **PL** | **闪烁** | `vision_top` 用户逻辑在运行 |
+
+**结论：我们的 bitstream + 新设备树让 PS 与 PL 同时正常工作，
+U-Boot 的 AXI GPIO 依赖、PL 的 DDR 帧缓冲冲突都已解决。**
+
+### 遗留：串口链路不可靠
+
+启动过程中 CH340 的 USB 连接反复掉线（`-110` 超时、`EIO`、重新枚举），
+导致内核启动后的日志丢失，无法在 Linux 里跑 `dmesg` / `ls /sys/class/fpga_manager`。
+
+**已尝试**：换 USB 线、换 USB 口、`usb unbind/bind`、换 PC 端口、被动监听、
+降低干扰 —— 均只能短暂工作，随后又断。
+
+**建议**：用一支 **USB-TTL 模块**（CH340/CP2102）直接接板子的 UART 排针
+（TX→RX、RX→TX、GND↔GND，3.3V 电平），彻底绕开板载 CH340。
+
+### 下一步（串口恢复后）
+
+1. 登录 `dart_7020`（root/root）
+2. `dmesg | grep -iE '41200000|43c00000|amba_pl'` —— 确认 AXI GPIO 与 vision_top 节点
+3. `cat /sys/class/fpga_manager/fpga0/state` —— 应为 `operating`
+4. `ls /proc/device-tree/amba_pl/` —— 应有两个 PL 设备
+5. LCD/摄像头画面验证
+6. 补 XDC 约束（时序告警）
+
