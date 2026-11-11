@@ -358,6 +358,12 @@ U-Boot 的 AXI GPIO 依赖、PL 的 DDR 帧缓冲冲突都已解决。**
 
 ### 底部 2x25 排针上的摄像头信号组（丝印 ↔ XDC）
 
+![摄像头 9 列接线对照表](hw/camera_wiring_table.png)
+
+> 上图是逐列核对出来的实际排布：第 1 列 `3.3V/GND`，第 2 列起是 VSYNC/SCL、
+> HREF/SDA、RST/D0 … 一直到第 9 列 `XCLK(空)/PWDN`。接线时**从 3.3V 那列开始数**，
+> 左边紧挨着是 5V，别错一格。
+
 | 上排 | 下排 | XDC 信号 |
 |---|---|---|
 | H15 | H16 | `cam_vsync` / `cam_scl` |
