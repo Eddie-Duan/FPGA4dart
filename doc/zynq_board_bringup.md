@@ -225,3 +225,82 @@ PL 一旦开始往它自己认为的帧缓冲地址写数据，就可能覆盖�
 我们的 bitstream 时 LCD 黑屏——可能是 `vision_top` 需要摄像头输入或需要软件配置
 它的 AXI 寄存器（当前 Linux 侧没有任何驱动，所以它可能一直处于未配置状态）。
 
+## 十三、厂商 U-Boot 的隐藏依赖：AXI GPIO @ 0x41200000（2026-11-11）
+
+排查中发现一个**关键坑**：厂商 U-Boot（正点原子定制版）在 `board_init` 里有一句
+自定义代码，启动时会访问 **`0x41200000`** 的 AXI GPIO 来点 LED：
+
+```
+axi_gpio <addr:0x41200000>      ← 打印这一行后立即访问该地址
+```
+
+**如果 PL 里没有这个地址的从设备，AXI 总线无响应，CPU 直接挂死**——
+这就是"换成我们的 bitstream 后跳内核即静默"的真正原因。
+
+### 我们的工程原状
+
+| 项 | 原状态 |
+|---|---|
+| `PCW_USE_M_AXI_GP0` | **0（未启用）** —— PS 到 PL 根本没有 AXI 主口 |
+| `vision_top/S_AXI` | **悬空** —— Linux 无法访问 PL 寄存器 |
+| AXI GPIO | 不存在 |
+
+### 已做的修改（Vivado）
+
+1. 使能 `M_AXI_GP0`
+2. 添加 `axi_gpio_0`，地址 **`0x41200000`**（Vivado 自动分配，正好对上）
+3. 把 `vision_top/S_AXI` 连到 `M_AXI_GP0`，地址 **`0x43C00000`**
+4. 重新综合/实现（时序全绿），导出 `zynq_vision.xsa`
+
+### 新 XSA 带来的设备树变化
+
+```
+amba_pl {
+    gpio@41200000           { reg = <0x41200000 0x10000>; }   ← axi_gpio
+    ov5640_lcd_zynq@43c00000 { reg = <0x43c00000 0x10000>; }  ← vision_top 寄存器
+};
+aliases { axi_gpio_0 = ...; vision_top = ...; };
+```
+
+`reserved-memory`（0x10000000 起 2 MB）保持不变。
+
+### 新 bitstream 标识
+
+```
+design filename = "system2_wrapper;UserID=0xFFFFFFFF;Version=2020.2"
+part number     = "7z020clg400"
+date            = 2026/11/11  13:55:16
+```
+
+### 踩坑记录：RTL 新文件必须手动 Add Sources
+
+`ov5640_lcd_zynq.v` 例化了 `vision_regs_axi`，但该文件没被加进 Vivado 工程，
+综合直接报 `[Synth 8-439] module 'vision_regs_axi' not found`。
+解决：`add_files -norecurse {rtl/vision_regs_axi.v}` + `update_compile_order`。
+
+**以后往 `rtl/` 加新文件，Vivado 不会自动感知，必须手动添加。**
+
+### 踩坑记录：CH340 端口号不稳定
+
+同一台机器上 `ttyUSB0` 有时是 CH340、有时是 FTDI（JTAG），每次重新枚举都可能交换。
+脚本里必须用 `udevadm info -q property -n /dev/ttyUSBx | grep 1a86` 来识别，
+不能写死端口号。
+
+另外 CH340 频繁出现 `usb control message -110`（超时）和 `open EIO`，
+恢复办法：usb unbind/bind（见第十一节）。
+
+## 十四、当前状态与下一步（2026-11-11 15:40）
+
+**已完成**：
+- 新 XSA（含 axi_gpio + vision_top S_AXI）导出并更新到 PetaLinux
+- 新 `system.dtb`（含 amba_pl 节点 + reserved-memory）
+- 新 `system.bit`（system2_wrapper, 2026/11/11 13:55）
+- 两个文件已写入 SD 卡并校验
+
+**待完成**：
+1. U-Boot 的 `bootcmd` 需要改回"**先加载 bitstream**"，否则 PL 未配置时
+   访问 0x41200000 会挂死
+2. 上电验证：系统是否能跑到 `dart_7020 login`，`dmesg` 里 `41200000.gpio` 是否 probe
+3. LCD/摄像头功能验证
+4. 补 XDC 约束（消除 `no_clock` 90 处、`unconstrained_internal_endpoints` 226 处等警告）
+
