@@ -1,2 +1,0 @@
-Error: vmrun was unable to start. Please make sure that vmrun is installed correctly and that you have enough resources available on your system.
-

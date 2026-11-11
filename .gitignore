@@ -57,3 +57,6 @@ c_cleanup_admin.ps1
 petalinux/out/
 BOOT.BIN
 image.ub
+
+# 另一会话的 VM 网络排查产物（不属于工程）
+.vm-ip-pin/
