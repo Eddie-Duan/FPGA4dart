@@ -349,3 +349,39 @@ U-Boot 的 AXI GPIO 依赖、PL 的 DDR 帧缓冲冲突都已解决。**
 5. LCD/摄像头画面验证
 6. 补 XDC 约束（时序告警）
 
+## 十六、板子引脚实拍图（2026-11-11）
+
+![Zynq MicroSYS 引脚实拍](hw/zynq_microsys_pinout.jpg)
+
+> 板子实际是杂牌（自称对标正点原子 ZYNQ MicroSYS），但**丝印网络与
+> `prj/zynq_challenger.xdc` 完全一致**，可以直接按 XDC 接线。
+
+### 底部 2x25 排针上的摄像头信号组（丝印 ↔ XDC）
+
+| 上排 | 下排 | XDC 信号 |
+|---|---|---|
+| H15 | H16 | `cam_vsync` / `cam_scl` |
+| G15 | H17 | `cam_href` / `cam_sda` |
+| N15 | E17 | `cam_rst_n` / `cam_data[0]` |
+| N16 | D18 | `cam_data[1]` / `cam_data[2]` |
+| M14 | G17 | `cam_data[3]` / `cam_data[4]` |
+| M15 | G18 | `cam_data[5]` / `cam_data[6]` |
+| L14 | K17 | `cam_data[7]` / `cam_pclk` |
+| L15 | K18 | （空）/ `cam_pwdn` |
+
+### 其它关键脚
+
+| 功能 | 引脚 | 说明 |
+|---|---|---|
+| PL LED | `G14` | 心跳灯，闪烁 = PL 逻辑在跑 |
+| PL 调试 UART | `F19` (rx) / `F20` (tx) | 视觉流水线调试口，可外接 USB-TTL |
+| 板载 USB-UART | PS `MIO14/15` | 直连 CH340，PL 用不了 |
+
+### 顶部右侧 2x9 座（P1）的坑
+
+P1 与 42 脚 RGB LCD 座**并接 14 根网络**，所以：
+
+- **LCD 插着时 P1 必须空着**
+- 摄像头应插到**底部 2x25 排针**（上面那张表），或者用 2x9 母座整排插到排针上
+  （从丝印 `3.3V` 那列开始往右 9 列；注意左边紧挨着是 5V，别错一格）
+

@@ -1,0 +1,126 @@
+
+Windows IP Configuration
+
+   Host Name . . . . . . . . . . . . : EddieDuanLegionY7000P
+   Primary Dns Suffix  . . . . . . . : 
+   Node Type . . . . . . . . . . . . : Hybrid
+   IP Routing Enabled. . . . . . . . : No
+   WINS Proxy Enabled. . . . . . . . : No
+
+Ethernet adapter 以太网:
+
+   Media State . . . . . . . . . . . : Media disconnected
+   Connection-specific DNS Suffix  . : 
+   Description . . . . . . . . . . . : Realtek PCIe GbE Family Controller
+   Physical Address. . . . . . . . . : 18-3D-2D-2B-4C-49
+   DHCP Enabled. . . . . . . . . . . : Yes
+   Autoconfiguration Enabled . . . . : Yes
+
+Unknown adapter Tailscale:
+
+   Connection-specific DNS Suffix  . : tail295b27.ts.net
+   Description . . . . . . . . . . . : Tailscale Tunnel
+   Physical Address. . . . . . . . . : 
+   DHCP Enabled. . . . . . . . . . . : No
+   Autoconfiguration Enabled . . . . : Yes
+   IPv6 Address. . . . . . . . . . . : fd7a:115c:a1e0::1437:967f(Preferred) 
+   Link-local IPv6 Address . . . . . : fe80::1225:c2c2:a237:9d8d%8(Preferred) 
+   IPv4 Address. . . . . . . . . . . : 100.101.150.126(Preferred) 
+   Subnet Mask . . . . . . . . . . . : 255.255.255.255
+   Default Gateway . . . . . . . . . : 
+   NetBIOS over Tcpip. . . . . . . . : Disabled
+   Connection-specific DNS Suffix Search List :
+                                       tail295b27.ts.net
+
+Ethernet adapter 以太网 2:
+
+   Media State . . . . . . . . . . . : Media disconnected
+   Connection-specific DNS Suffix  . : 
+   Description . . . . . . . . . . . : Sangfor SSL VPN CS Support System VNIC
+   Physical Address. . . . . . . . . : 00-FF-FA-AF-C0-F5
+   DHCP Enabled. . . . . . . . . . . : No
+   Autoconfiguration Enabled . . . . : Yes
+
+Wireless LAN adapter WLAN 4:
+
+   Media State . . . . . . . . . . . : Media disconnected
+   Connection-specific DNS Suffix  . : 
+   Description . . . . . . . . . . . : MediaTek Wi-Fi 7 MT7925 Wireless LAN Card #4
+   Physical Address. . . . . . . . . : DE-56-7B-48-48-75
+   DHCP Enabled. . . . . . . . . . . : Yes
+   Autoconfiguration Enabled . . . . : Yes
+
+Wireless LAN adapter WLAN 5:
+
+   Media State . . . . . . . . . . . : Media disconnected
+   Connection-specific DNS Suffix  . : 
+   Description . . . . . . . . . . . : MediaTek Wi-Fi 7 MT7925 Wireless LAN Card #5
+   Physical Address. . . . . . . . . : DE-56-7B-48-58-65
+   DHCP Enabled. . . . . . . . . . . : Yes
+   Autoconfiguration Enabled . . . . : Yes
+
+Ethernet adapter VMware Network Adapter VMnet1:
+
+   Connection-specific DNS Suffix  . : 
+   Description . . . . . . . . . . . : VMware Virtual Ethernet Adapter for VMnet1
+   Physical Address. . . . . . . . . : 00-50-56-C0-00-01
+   DHCP Enabled. . . . . . . . . . . : Yes
+   Autoconfiguration Enabled . . . . : Yes
+   Link-local IPv6 Address . . . . . : fe80::3127:d52a:e7fd:b975%13(Preferred) 
+   IPv4 Address. . . . . . . . . . . : 192.168.187.1(Preferred) 
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Lease Obtained. . . . . . . . . . : 2026年11月11日 15:26:31
+   Lease Expires . . . . . . . . . . : 2026年11月11日 21:58:47
+   Default Gateway . . . . . . . . . : 
+   DHCP Server . . . . . . . . . . . : 192.168.187.254
+   DHCPv6 IAID . . . . . . . . . . . : 822104150
+   DHCPv6 Client DUID. . . . . . . . : 00-01-00-01-2F-D8-47-DC-18-3D-2D-2B-4C-49
+   NetBIOS over Tcpip. . . . . . . . : Enabled
+
+Ethernet adapter VMware Network Adapter VMnet8:
+
+   Connection-specific DNS Suffix  . : 
+   Description . . . . . . . . . . . : VMware Virtual Ethernet Adapter for VMnet8
+   Physical Address. . . . . . . . . : 00-50-56-C0-00-08
+   DHCP Enabled. . . . . . . . . . . : Yes
+   Autoconfiguration Enabled . . . . : Yes
+   Link-local IPv6 Address . . . . . : fe80::2f7c:92b3:683b:a5a7%6(Preferred) 
+   IPv4 Address. . . . . . . . . . . : 192.168.189.1(Preferred) 
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Lease Obtained. . . . . . . . . . : 2026年11月11日 15:26:31
+   Lease Expires . . . . . . . . . . : 2026年11月11日 21:58:47
+   Default Gateway . . . . . . . . . : 
+   DHCP Server . . . . . . . . . . . : 192.168.189.254
+   DHCPv6 IAID . . . . . . . . . . . : 838881366
+   DHCPv6 Client DUID. . . . . . . . : 00-01-00-01-2F-D8-47-DC-18-3D-2D-2B-4C-49
+   Primary WINS Server . . . . . . . : 192.168.189.2
+   NetBIOS over Tcpip. . . . . . . . : Enabled
+
+Wireless LAN adapter WLAN:
+
+   Connection-specific DNS Suffix  . : 
+   Description . . . . . . . . . . . : MediaTek Wi-Fi 7 MT7925 Wireless LAN Card
+   Physical Address. . . . . . . . . : DC-56-7B-48-78-45
+   DHCP Enabled. . . . . . . . . . . : Yes
+   Autoconfiguration Enabled . . . . : Yes
+   IPv6 Address. . . . . . . . . . . : 2400:dd01:103a:4008:3e00:d786:d0b8:5fd3(Preferred) 
+   IPv6 Address. . . . . . . . . . . : 2400:dd01:103a:4032:159b:3ffb:4698:2397(Preferred) 
+   Temporary IPv6 Address. . . . . . : 2400:dd01:103a:4008:69c1:50f5:6e4c:1bdf(Preferred) 
+   Temporary IPv6 Address. . . . . . : 2400:dd01:103a:4032:3837:65f5:bc94:12a4(Preferred) 
+   Link-local IPv6 Address . . . . . : fe80::50f4:cf48:3cca:d879%3(Preferred) 
+   IPv4 Address. . . . . . . . . . . : 10.207.30.34(Preferred) 
+   Subnet Mask . . . . . . . . . . . : 255.255.0.0
+   Lease Obtained. . . . . . . . . . : 2026年11月11日 15:26:30
+   Lease Expires . . . . . . . . . . : 2026年11月12日 20:52:30
+   Default Gateway . . . . . . . . . : fe80::327b:acff:fe69:3802%3
+                                       fe80::9274:2eff:fee7:451e%3
+                                       10.207.255.254
+   DHCP Server . . . . . . . . . . . : 10.207.255.254
+   DHCPv6 IAID . . . . . . . . . . . : 64771707
+   DHCPv6 Client DUID. . . . . . . . : 00-01-00-01-2F-D8-47-DC-18-3D-2D-2B-4C-49
+   DNS Servers . . . . . . . . . . . : 210.77.16.1
+                                       123.123.123.123
+                                       159.226.8.7
+                                       210.76.203.36
+                                       202.38.64.1
+   NetBIOS over Tcpip. . . . . . . . : Enabled
