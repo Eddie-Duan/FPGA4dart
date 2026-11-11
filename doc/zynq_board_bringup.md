@@ -182,3 +182,46 @@ echo -n "$p" > /sys/bus/usb/drivers/usb/bind
 Zynq + LCD 峰值电流可能超过普通 USB 口的 500 mA）。建议用后置 USB 3.0 口，
 或改用板子的独立 DC 供电口。
 
+## 十二、两个 bitstream 的 A/B 对照（2026-11-11）
+
+同样一套 PetaLinux 系统（内核/设备树/rootfs 完全相同），只换 SD 卡上的
+`system.bit`，结果：
+
+| bitstream | 标识 | 结果 |
+|---|---|---|
+| **厂商**（2021/09/26） | `design_mini_7020_wrapper;Version=2018.3` | ✅ 完整启动到 `dart_7020 login:` |
+| **我们自己的**（2026/10/18） | `system_wrapper;Version=2020.2` | ⚠️ 加载成功（DONE 亮），启动到一半静默 |
+
+**结论：问题在我们的 PL 设计，不在 PetaLinux / 内核 / 设备树 / 内存容量。**
+
+### 最可能的原因：PL 的 AXI 主口踩了 Linux 的内存
+
+`vision_top/M_AXI → PS S_AXI_HP0 → HP0_DDR_LOWOCM`，即 PL 可以直接写整块 DDR。
+但设备树里**没有任何 `reserved-memory` 保护**，Linux 把全部 1 GB 当自己的内存用。
+PL 一旦开始往它自己认为的帧缓冲地址写数据，就可能覆盖内核/用户空间 → 系统卡死。
+
+### 需要两件事配合才能解决
+
+1. **Linux 侧**：设备树加 `reserved-memory`，把 PL 帧缓冲那段从 Linux 手里扣掉
+   ```dts
+   reserved-memory {
+       #address-cells = <1>;
+       #size-cells = <1>;
+       ranges;
+       pl_framebuf: framebuf@30000000 {
+           reg = <0x30000000 0x10000000>;   /* 256 MB */
+           no-map;
+       };
+   };
+   ```
+2. **PL 侧**：`vision_top` 的 DDR 写基地址必须落在同一段保留区内
+   （看 IP 的 GUI 参数或 RTL 里的 base address 参数）
+
+**两边地址必须严格对齐**，只做一边没有意义。
+
+### 另：LCD 无画面
+
+厂商 bitstream 时 LCD 显示 ALIENTEK OS（说明 LCD 硬件和排线是好的）。
+我们的 bitstream 时 LCD 黑屏——可能是 `vision_top` 需要摄像头输入或需要软件配置
+它的 AXI 寄存器（当前 Linux 侧没有任何驱动，所以它可能一直处于未配置状态）。
+
