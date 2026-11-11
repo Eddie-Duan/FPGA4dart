@@ -391,3 +391,54 @@ P1 与 42 脚 RGB LCD 座**并接 14 根网络**，所以：
 - 摄像头应插到**底部 2x25 排针**（上面那张表），或者用 2x9 母座整排插到排针上
   （从丝印 `3.3V` 那列开始往右 9 列；注意左边紧挨着是 5V，别错一格）
 
+
+## 十七、USB-TTL 接入 PL 调试口（2026-11-11 晚）
+
+### 设备识别
+
+板上和外部一共有三路 USB 串口，容易搞混：
+
+| 设备 | 用途 |
+|---|---|
+| 板载 CH340 (`1a86:7523`) | PS 的 Linux 控制台（MIO14/15） |
+| 板载 FTDI (`0403:6014`) | JTAG（Digilent 兼容） |
+| 外接 USB-TTL 模块（也是 `1a86:7523`） | 接到 PL 调试口 **F20(tx) / F19(rx)** |
+
+**只看到一个设备时**，通常是板子的 USB 线没插，PC 上只剩外接模块。
+
+### 已观测到的现象
+
+把外接模块的 RXD 接到 **F20**、GND 接板子 GND，上电监听（115200 8N1）：
+
+```
+收到 3507 字节（20 秒），但为二进制/乱码，可打印比例很低
+```
+
+**结论：PL 的调试 UART 确实在发送数据**（视觉流水线有输出），
+只是波特率或数据格式还没对上。下一步需要扫描波特率，或确认它是二进制协议。
+
+### 板载串口仍然不稳定
+
+同一晚 CH340 反复出现：
+
+```
+usb control message -110 (ETIMEDOUT)
+/dev/ttyUSB0 open failed: Input/output error
+设备反复 disconnect / re-enumerate，且 ttyUSB 编号每次重排
+```
+
+**恢复手段**（需要用 udev 按 `1a86` 找路径，不能写死端口号）：
+
+```bash
+p=$(ls -d /sys/bus/usb/devices/*/ | while read d; do \
+      [ -e "$d/idVendor" ] && [ "$(cat $d/idVendor)" = "1a86" ] && basename $d; done | head -1)
+echo -n "$p" > /sys/bus/usb/drivers/usb/unbind; sleep 2
+echo -n "$p" > /sys/bus/usb/drivers/usb/bind
+```
+
+### 待验证
+
+- [ ] 扫 PL 调试口的波特率（9600 / 57600 / 115200 / 921600）
+- [ ] 若为二进制协议，按 `uart_rx.v` / `uart_tx.v` 的帧格式解析
+- [ ] 用 PL 调试信息判断：摄像头是否出数据、是否卡在等 vsync
+- [ ] LCD 出图
