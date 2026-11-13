@@ -505,3 +505,117 @@ Starting kernel ...
 扫描波特率时把 `115200` 当普通整数传给 `termios.tcsetattr`，
 导致全部返回 `EINVAL`。必须用 `termios.B115200` 这类常量
 （值 13，不是 115200）。
+
+## 十九、**真相：内核从未挂起，是设备树把外设全禁用了**（2026-11-13）
+
+### 症状
+
+换新 XSA 重建后，串口日志永远停在：
+
+```
+axi_gpio <addr:0x41200000>
+Alientek LCD ID: 4
+Starting kernel ...
+（之后无输出）
+```
+
+看起来像内核挂死。为此做了大量对照实验（换厂商 bitstream、去掉 `amba_pl`、
+去掉 `reserved-memory`、拔摄像头），**全部无效**——因为根本不是那个问题。
+
+### 真正原因
+
+把设备树反编译出来一看：
+
+```dts
+chosen {
+    bootargs = [00];
+    stdout-path = "serial0:notfoundn8";   /* 波特率是字面量 "notfound" */
+};
+
+aliases {
+};                                        /* 空的，没有 serial0 */
+
+serial@e0000000 { status = "disabled"; }  /* UART0 被禁用 */
+serial@e0001000 { status = "disabled"; }  /* UART1 被禁用 */
+mmc@e0100000    { status = "disabled"; }  /* SD 卡被禁用 */
+ethernet@e000b000 { status = "disabled"; }
+```
+
+**一共 17 个 PS 外设被禁用。**
+
+根源是执行 `petalinux-config --get-hw-description=<新XSA>` 时，
+`CONFIG_SUBSYSTEM_SERIAL_*` 等外设选择项被重置，生成器没能解析出串口，
+于是 `stdout-path` 写成 `serial0:notfoundn8`、UART 节点保持 disabled。
+
+**内核其实一直正常启动，只是没有控制台输出**——所有"挂死"判断都是误判。
+
+### 修复
+
+不动自动生成的 `system-conf.dtsi`，直接在 meta-user 的 overlay 里覆盖
+（`project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi`）：
+
+```dts
+&uart0 { status = "okay"; };
+&sdhci0 { status = "okay"; };
+&gpio0  { status = "okay"; };
+
+/ {
+    aliases {
+        serial0 = &uart0;
+    };
+    chosen {
+        stdout-path = "serial0:115200n8";
+    };
+};
+```
+
+重建：
+
+```bash
+petalinux-build -c device-tree -x cleansstate
+petalinux-build -c device-tree
+```
+
+### 验证结果（全部实测）
+
+```
+PetaLinux 2020.2 dart_7020 /dev/ttyPS0
+dart_7020 login:
+
+root@dart_7020:~# cat /sys/class/fpga_manager/fpga0/state
+operating
+
+root@dart_7020:~# ls /proc/device-tree/amba_pl/
+gpio@41200000  ov5640_lcd_zynq@43c00000  compatible  ranges
+
+root@dart_7020:~# dmesg | grep -iE 'fpga|41200000|mmc0'
+FPGA manager framework
+XGpio: gpio@41200000: registered, base is 992
+mmc0: SDHCI controller on e0100000.mmc [e0100000.mmc] using ADMA
+fpga_manager fpga0: Xilinx Zynq FPGA Manager registered
+of-fpga-region fpga-full: FPGA Region probed
+mmcblk0: mmc0:0001 SD16G 14.6 GiB
+
+root@dart_7020:~# devmem 0x43C00000
+0x56495331          /* "VIS1" —— vision_regs_axi 的 ID 寄存器 */
+```
+
+**`0x56495331 = "VIS1"` 是 `rtl/vision_regs_axi.v` 里 `ID_VALUE` 的定义值，
+证明 PL 里跑的正是我们自己的 `vision_top` 设计，且 PS→PL AXI 通路完全正常。**
+
+### 换 bitstream 不用拔卡
+
+SD 卡可读写后，可以直接在板子上替换：
+
+```bash
+mount /dev/mmcblk0p1 /mnt
+cp /mnt/system_ours.bit /mnt/system.bit   # 备份留在 system_ours.bit
+sync
+reboot
+```
+
+### 遗留
+
+- **Ethernet 仍 disabled**（`Cannot find device "eth0"`）：需要同样启用 `&gem0`
+- LCD 无画面：摄像头/XCLK 待查
+- 其余外设（i2c/spi/usb）按需在 overlay 里逐个打开
