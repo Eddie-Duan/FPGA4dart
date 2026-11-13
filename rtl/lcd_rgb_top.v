@@ -57,10 +57,14 @@ assign lcd_rgb = lcd_de ?  lcd_rgb_o :  {24{1'bz}};
 assign lcd_rgb_i = lcd_rgb;
 
 //Ê±ÖÓ·ÖÆµÄ£¿é
+localparam [15:0] LCD_ID_FORCE = 16'h4384;  // ATK-4384 800x480 (ID read broken: lcd_rst tied high)
+wire [15:0] lcd_id_rd;
+assign lcd_id = LCD_ID_FORCE;
+
 clk_div u_clk_div(
     .clk       (sys_clk  ),
     .rst_n     (sys_rst_n),
-    .lcd_id    (lcd_id   ),
+    .lcd_id    (lcd_id_rd),
     .lcd_pclk  (lcd_clk  )
     );  
 

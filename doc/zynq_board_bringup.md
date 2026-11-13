@@ -619,3 +619,76 @@ reboot
 - **Ethernet 仍 disabled**（`Cannot find device "eth0"`）：需要同样启用 `&gem0`
 - LCD 无画面：摄像头/XCLK 待查
 - 其余外设（i2c/spi/usb）按需在 overlay 里逐个打开
+
+## 二十、LCD ID 问题与摄像头数据打通（2026-11-13 夜）
+
+### 系统层面全部打通
+
+修复设备树外设后，实测通过：
+
+```
+dart_7020 login:                     登录正常
+fpga0 state = operating              PL 已配置
+XGpio: gpio@41200000: registered     AXI GPIO 驱动 probe
+mmc0: SDHCI ... 14.6 GiB             SD 卡可用
+devmem 0x43C00000 = 0x56495331       PL 里是我们的 RTL（"VIS1"）
+```
+
+### LCD 黑屏的根因：lcd_id 读不到
+
+`lcd_rgb_top` 里 `rd_id` 模块本应在上电时读 LCD 的 ID，
+但 `lcd_driver.v` 把复位写死了：
+
+```verilog
+assign lcd_rst = 1'b1;   // ← 常量，LCD 永远不复位 → 无法输出 ID
+```
+
+于是 `lcd_id = 0`，导致 `picture_size` / `lcd_driver` / `i2c_ov5640_rgb565_cfg`
+全部按 **480×272**（default 分支）工作，而实际 LCD 是 **ATK-4384 = 800×480**。
+
+### 修复
+
+在 `rtl/lcd_rgb_top.v` 里强制指定 ID（先保证能用，ID 自动识别以后再说）：
+
+```verilog
+localparam [15:0] LCD_ID_FORCE = 16'h4384;  // ATK-4384 800x480
+wire [15:0] lcd_id_rd;
+assign lcd_id = LCD_ID_FORCE;
+// rd_id 实例改为输出到 lcd_id_rd（不参与逻辑）
+```
+
+重新综合（Vivado batch）后写入卡上 `system.bit`。
+
+### 效果：摄像头数据成功进 DDR
+
+修复前（lcd_id=0，480×272）：
+
+```
+devmem 0x10000000 = 0xFFFFFFFF   帧缓冲区完全没数据
+```
+
+修复后（lcd_id=0x4384，800×480）：
+
+```
+devmem 0x10000000 = 0x0101FDF2   ← 真实图像数据
+devmem 0x10010000 = 0x4140407B
+```
+
+**摄像头 → PL → PS DDR3 的采集链路已经打通。**
+
+### 仍存在的问题：LCD 仍黑屏
+
+- 背光正常（屏幕有灰白亮光），`lcd_bl` 在 RTL 里恒为 1
+- 但 `FRAME_CNT (0x43C00014)` 现在读出来是 **0**，说明显示域没有产生 vsync
+- 目标寄存器 `CX/CY/AX/AY` 全 0（没有识别到目标，视野里可能确实没有装甲板）
+
+怀疑点：`lcd_clk`（由 `clk_div` 从 50 MHz 分频，0x4384 时输出 25 MHz）
+是否真的在跑，以及 `lcd_driver` 的时序是否输出。
+
+**下一步**：用 Vivado ILA 抓 `lcd_clk / lcd_hs / lcd_vs / lcd_de / rd_vsync / rfifo` 这几个信号，
+确认是"时钟没跑"还是"时序跑了但数据是黑的"。
+
+### 踩坑：USB 串口权限
+
+手动 `usb unbind/bind` 后 `/dev/ttyUSB*` 会变成 `crw------- root:root`
+（udev 规则没生效），普通用户打不开。解决：用 `sudo` 跑串口脚本。
