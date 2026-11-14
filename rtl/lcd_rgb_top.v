@@ -64,7 +64,7 @@ assign lcd_id = LCD_ID_FORCE;
 clk_div u_clk_div(
     .clk       (sys_clk  ),
     .rst_n     (sys_rst_n),
-    .lcd_id    (lcd_id_rd),
+    .lcd_id    (lcd_id),
     .lcd_pclk  (lcd_clk  )
     );  
 
@@ -73,7 +73,7 @@ rd_id u_rd_id(
     .clk       (sys_clk  ),
     .rst_n     (sys_rst_n),
     .lcd_rgb   (lcd_rgb_i),
-    .lcd_id    (lcd_id   )
+    .lcd_id    (lcd_id_rd)
     );  
 
 //lcdÇý¶¯Ä£¿é
