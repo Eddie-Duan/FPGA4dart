@@ -252,20 +252,10 @@ assign led = dbg_lcd_cnt[23];  // lcd_clk 心跳 (~1.5Hz @25MHz)
 // camera configuration and DVP capture
 //--------------------------------------------------------------------------
 // ------------------------------------------------------------------
-// FCLK_CLK1 在 vendor 的 ps7_init 里没使能（写 SLCR 也救不回来），
-// 这里改用确定工作的 ui_clk(100MHz) 二分频出 50MHz 给 LCD/视觉域。
-// ------------------------------------------------------------------
-reg  lcd_sys_div_r;
-always @(posedge ui_clk or negedge rst_n) begin
-    if (!rst_n) lcd_sys_div_r <= 1'b0;
-    else        lcd_sys_div_r <= ~lcd_sys_div_r;
-end
-wire lcd_sys_clk_i;
-BUFG u_bufg_lcd_sys (.I(lcd_sys_div_r), .O(lcd_sys_clk_i));  // 必须过 BUFG，否则时钟偏斜过大
 
 picture_size u_picture_size (
     .rst_n              (rst_n         ),
-    .clk                (lcd_sys_clk_i),
+    .clk                (lcd_sys_clk),
     .lcd_id             (lcd_id        ),
     .cmos_h_pixel       (h_disp        ),
     .cmos_v_pixel       (v_disp        ),
@@ -277,7 +267,7 @@ picture_size u_picture_size (
     );
 
 ov5640_dri u_ov5640_dri (
-    .clk               (lcd_sys_clk_i),
+    .clk               (lcd_sys_clk),
     .rst_n             (rst_n             ),
     .cam_pclk          (cam_pclk          ),
     .cam_vsync         (cam_vsync         ),
@@ -379,7 +369,7 @@ axi_frame_buf u_axi_frame_buf (
 // LCD timing
 //--------------------------------------------------------------------------
 lcd_rgb_top u_lcd_rgb_top (
-    .sys_clk        (lcd_sys_clk_i),
+    .sys_clk        (lcd_sys_clk),
     .sys_rst_n      (rst_n         ),
     .sys_init_done  (sys_init_done ),
     .lcd_id         (lcd_id        ),

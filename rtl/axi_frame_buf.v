@@ -109,17 +109,28 @@ wire rd_frame_start = rd_load_sync & ~rd_load_prev;
 
 // The writer toggles pages once per camera frame; the reader always reads the
 // other page. The initial page is undefined until one full camera frame is stored.
+// 写侧每帧切页；读侧在 LCD 帧开始时锁存"最近写完的页"，
+// 避免读的过程中页号突变导致画面跳动 / 撕裂。
 reg wr_page;
+reg wr_page_done;
+always @(posedge ui_clk or negedge rst_n) begin
+    if (!rst_n) begin
+        wr_page      <= 1'b0;
+        wr_page_done <= 1'b0;
+    end else if (wr_frame_start) begin
+        wr_page_done <= wr_page;      // 刚写完的那一页
+        wr_page      <= ~wr_page;
+    end
+end
+
+reg rd_page_r;
 always @(posedge ui_clk or negedge rst_n) begin
     if (!rst_n)
-        wr_page <= 1'b0;
-    else if (wr_frame_start)
-        wr_page <= ~wr_page;
+        rd_page_r <= 1'b0;
+    else if (rd_frame_start)
+        rd_page_r <= wr_page_done;    // 整帧内保持不变
 end
-wire rd_page = ~wr_page;
-
-// AXI3 write controller. Each FIFO word is fetched once then sent low 64 bits,
-// followed by high 64 bits. VALID remains asserted until a real handshake.
+wire rd_page = rd_page_r;
 reg [2:0] wstate;
 reg [4:0] wbeat;
 reg [31:0] w_word_off;
