@@ -61,7 +61,7 @@ always @(*) begin
         16'h4342 : lcd_pclk = clk_12_5m;
         16'h7084 : lcd_pclk = clk_25m;
         16'h7016 : lcd_pclk = clk;
-        16'h4384 : lcd_pclk = clk_25m;
+        16'h4384 : lcd_pclk = clk;   // pass-through: 33.3MHz in -> 60Hz refresh (was clk_25m = 45Hz)
         16'h1018 : lcd_pclk = clk;
         default :  lcd_pclk = 1'b0;
     endcase      

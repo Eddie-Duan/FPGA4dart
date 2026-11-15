@@ -91,14 +91,14 @@ parameter  V_FRONT_1018  =  11'd10;     //场显示前沿
 parameter  V_TOTAL_1018  =  11'd823;    //场扫描周期
 
 // 4.3' 800*480   
-parameter  H_SYNC_4384   =  11'd128;    //行同步
+parameter  H_SYNC_4384   =  11'd48;     // hsync (was 128; standard 800x480 = 48)
 parameter  H_BACK_4384   =  11'd88;     //行显示后沿
 parameter  H_DISP_4384   =  11'd800;    //行有效数据
-parameter  H_FRONT_4384  =  11'd40;     //行显示前沿
+parameter  H_FRONT_4384  =  11'd120;    // keep h_total = 1056
 parameter  H_TOTAL_4384  =  11'd1056;   //行扫描周期
    
-parameter  V_SYNC_4384   =  11'd2;      //场同步
-parameter  V_BACK_4384   =  11'd33;     //场显示后沿
+parameter  V_SYNC_4384   =  11'd3;      // vsync (standard)
+parameter  V_BACK_4384   =  11'd32;     // vback (was 33)
 parameter  V_DISP_4384   =  11'd480;    //场有效数据
 parameter  V_FRONT_4384  =  11'd10;     //场显示前沿
 parameter  V_TOTAL_4384  =  11'd525;    //场扫描周期    

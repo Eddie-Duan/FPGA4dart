@@ -22,8 +22,9 @@
         "m00_couplers": {},
         "m01_couplers": {}
       },
+      "clk_wiz_lcd": "",
       "vision_top": "",
-      "clk_wiz_lcd": ""
+      "clk_wiz_pix": ""
     },
     "interface_ports": {
       "DDR": {
@@ -652,16 +653,16 @@
               }
             },
             "interface_nets": {
-              "auto_pc_to_s00_couplers": {
-                "interface_ports": [
-                  "M_AXI",
-                  "auto_pc/M_AXI"
-                ]
-              },
               "s00_couplers_to_auto_pc": {
                 "interface_ports": [
                   "S_AXI",
                   "auto_pc/S_AXI"
+                ]
+              },
+              "auto_pc_to_s00_couplers": {
+                "interface_ports": [
+                  "M_AXI",
+                  "auto_pc/M_AXI"
                 ]
               }
             },
@@ -790,6 +791,12 @@
           }
         },
         "interface_nets": {
+          "xbar_to_m01_couplers": {
+            "interface_ports": [
+              "xbar/M01_AXI",
+              "m01_couplers/S_AXI"
+            ]
+          },
           "ps7_0_axi_periph_to_s00_couplers": {
             "interface_ports": [
               "S00_AXI",
@@ -808,22 +815,16 @@
               "m00_couplers/M_AXI"
             ]
           },
-          "xbar_to_m00_couplers": {
-            "interface_ports": [
-              "xbar/M00_AXI",
-              "m00_couplers/S_AXI"
-            ]
-          },
           "m01_couplers_to_ps7_0_axi_periph": {
             "interface_ports": [
               "M01_AXI",
               "m01_couplers/M_AXI"
             ]
           },
-          "xbar_to_m01_couplers": {
+          "xbar_to_m00_couplers": {
             "interface_ports": [
-              "xbar/M01_AXI",
-              "m01_couplers/S_AXI"
+              "xbar/M00_AXI",
+              "m00_couplers/S_AXI"
             ]
           }
         },
@@ -851,6 +852,38 @@
               "m00_couplers/S_ARESETN",
               "m01_couplers/S_ARESETN"
             ]
+          }
+        }
+      },
+      "clk_wiz_lcd": {
+        "vlnv": "xilinx.com:ip:clk_wiz:6.0",
+        "xci_name": "system2_clk_wiz_lcd_0",
+        "xci_path": "ip\\system2_clk_wiz_lcd_0\\system2_clk_wiz_lcd_0.xci",
+        "inst_hier_path": "clk_wiz_lcd",
+        "parameters": {
+          "CLKOUT1_REQUESTED_OUT_FREQ": {
+            "value": "50.000"
+          },
+          "PRIMITIVE": {
+            "value": "MMCM"
+          },
+          "PRIM_IN_FREQ": {
+            "value": "100.000"
+          },
+          "RESET_PORT": {
+            "value": "resetn"
+          },
+          "RESET_TYPE": {
+            "value": "ACTIVE_LOW"
+          },
+          "USE_LOCKED": {
+            "value": "false"
+          },
+          "USE_MIN_POWER": {
+            "value": "false"
+          },
+          "USE_RESET": {
+            "value": "true"
           }
         }
       },
@@ -1393,13 +1426,31 @@
               }
             }
           },
+          "lcd_pix_clk": {
+            "type": "clk",
+            "direction": "I",
+            "parameters": {
+              "FREQ_HZ": {
+                "value": "33333333",
+                "value_src": "constant"
+              },
+              "PHASE": {
+                "value": "0.0",
+                "value_src": "ip_prop"
+              },
+              "CLK_DOMAIN": {
+                "value": "/clk_wiz_pix_clk_out1",
+                "value_src": "ip_prop"
+              }
+            }
+          },
           "lcd_sys_clk": {
             "type": "clk",
             "direction": "I",
             "parameters": {
               "FREQ_HZ": {
                 "value": "50000000",
-                "value_src": "constant"
+                "value_src": "ip_prop"
               },
               "PHASE": {
                 "value": "0.0",
@@ -1522,14 +1573,14 @@
           }
         }
       },
-      "clk_wiz_lcd": {
+      "clk_wiz_pix": {
         "vlnv": "xilinx.com:ip:clk_wiz:6.0",
-        "xci_name": "system2_clk_wiz_lcd_0",
-        "xci_path": "ip\\system2_clk_wiz_lcd_0\\system2_clk_wiz_lcd_0.xci",
-        "inst_hier_path": "clk_wiz_lcd",
+        "xci_name": "system2_clk_wiz_pix_0",
+        "xci_path": "ip\\system2_clk_wiz_pix_0\\system2_clk_wiz_pix_0.xci",
+        "inst_hier_path": "clk_wiz_pix",
         "parameters": {
           "CLKOUT1_REQUESTED_OUT_FREQ": {
-            "value": "50.000"
+            "value": "33.333"
           },
           "PRIMITIVE": {
             "value": "MMCM"
@@ -1544,9 +1595,6 @@
             "value": "ACTIVE_LOW"
           },
           "USE_LOCKED": {
-            "value": "false"
-          },
-          "USE_MIN_POWER": {
             "value": "false"
           },
           "USE_RESET": {
@@ -1568,6 +1616,12 @@
           "processing_system7_0/DDR"
         ]
       },
+      "ps7_0_axi_periph_M00_AXI": {
+        "interface_ports": [
+          "ps7_0_axi_periph/M00_AXI",
+          "axi_gpio_0/S_AXI"
+        ]
+      },
       "vision_top_M_AXI": {
         "interface_ports": [
           "vision_top/M_AXI",
@@ -1578,12 +1632,6 @@
         "interface_ports": [
           "processing_system7_0/M_AXI_GP0",
           "ps7_0_axi_periph/S00_AXI"
-        ]
-      },
-      "ps7_0_axi_periph_M00_AXI": {
-        "interface_ports": [
-          "ps7_0_axi_periph/M00_AXI",
-          "axi_gpio_0/S_AXI"
         ]
       },
       "ps7_0_axi_periph_M01_AXI": {
@@ -1605,8 +1653,9 @@
           "ps7_0_axi_periph/M00_ACLK",
           "ps7_0_axi_periph/ACLK",
           "ps7_0_axi_periph/M01_ACLK",
+          "clk_wiz_lcd/clk_in1",
           "vision_top/ui_clk",
-          "clk_wiz_lcd/clk_in1"
+          "clk_wiz_pix/clk_in1"
         ]
       },
       "processing_system7_0_FCLK_RESET0_N": {
@@ -1623,8 +1672,9 @@
           "ps7_0_axi_periph/M00_ARESETN",
           "ps7_0_axi_periph/ARESETN",
           "ps7_0_axi_periph/M01_ARESETN",
+          "clk_wiz_lcd/resetn",
           "vision_top/rst_n",
-          "clk_wiz_lcd/resetn"
+          "clk_wiz_pix/resetn"
         ]
       },
       "cam_pclk_1": {
@@ -1739,6 +1789,12 @@
         "ports": [
           "clk_wiz_lcd/clk_out1",
           "vision_top/lcd_sys_clk"
+        ]
+      },
+      "clk_wiz_pix_clk_out1": {
+        "ports": [
+          "clk_wiz_pix/clk_out1",
+          "vision_top/lcd_pix_clk"
         ]
       }
     },

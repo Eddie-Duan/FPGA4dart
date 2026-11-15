@@ -42,6 +42,9 @@ module ov5640_lcd_zynq (
     input          ui_clk        , // FCLK_CLK0, 100 MHz
     (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 LCD_SYS_CLK CLK",
        X_INTERFACE_PARAMETER = "XIL_INTERFACENAME LCD_SYS_CLK, FREQ_HZ 50000000" *)
+    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 LCD_PIX_CLK CLK",
+       X_INTERFACE_PARAMETER = "XIL_INTERFACENAME LCD_PIX_CLK, FREQ_HZ 33333333" *)
+    input          lcd_pix_clk   , // 33.3MHz pixel clock (from clk_wiz), 60Hz refresh
     input          lcd_sys_clk   , // FCLK_CLK1,  50 MHz
     (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 rst_n RST",
        X_INTERFACE_PARAMETER = "XIL_INTERFACENAME rst_n, POLARITY ACTIVE_LOW" *)
@@ -368,8 +371,21 @@ axi_frame_buf u_axi_frame_buf (
 //--------------------------------------------------------------------------
 // LCD timing
 //--------------------------------------------------------------------------
+// ================= 测试图案：验证 LCD 时序（绕过帧缓冲）================
+localparam TEST_PAT = 1'b0;   // 0 = normal camera path (1 = color bars)
+wire [10:0] tp_px, tp_py;
+wire [15:0] tp_data = (tp_px < 11'd114) ? 16'hF800 :
+                     (tp_px < 11'd228) ? 16'h07E0 :
+                     (tp_px < 11'd342) ? 16'h001F :
+                     (tp_px < 11'd456) ? 16'hFFE0 :
+                     (tp_px < 11'd570) ? 16'hF81F :
+                     (tp_px < 11'd684) ? 16'h07FF :
+                     (tp_px < 11'd798) ? 16'hFFFF : 16'h0000;
+// 顶部 40 行画白框，便于观察对齐
+wire [15:0] tp_data2 = (tp_py < 11'd20) ? 16'hFFFF : tp_data;
+
 lcd_rgb_top u_lcd_rgb_top (
-    .sys_clk        (lcd_sys_clk),
+    .sys_clk        (lcd_pix_clk),
     .sys_rst_n      (rst_n         ),
     .sys_init_done  (sys_init_done ),
     .lcd_id         (lcd_id        ),
@@ -384,9 +400,9 @@ lcd_rgb_top u_lcd_rgb_top (
     .out_vsync      (rd_vsync      ),
     .h_disp         (              ),
     .v_disp         (              ),
-    .pixel_xpos     (              ),
-    .pixel_ypos     (              ),
-    .data_in        (lcd_data      ),
+    .pixel_xpos     (tp_px),
+    .pixel_ypos     (tp_py),
+    .data_in        (TEST_PAT ? tp_data2 : lcd_data),
     .data_req       (rdata_req     )
     );
 
