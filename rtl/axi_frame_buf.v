@@ -8,7 +8,10 @@ module axi_frame_buf #(
     parameter integer C_FRAME_WORDS = 48000,
     parameter integer C_BURST_WORDS = 8,
     parameter [31:0] C_PAGE0_BASE = 32'h1000_0000,
-    parameter [31:0] C_PAGE1_BASE = 32'h1010_0000
+    parameter [31:0] C_PAGE1_BASE = 32'h1010_0000,
+    // 诊断开关：1 = 单缓冲（读写都用 PAGE0），用于验证双页竞态
+    parameter        SINGLE_BUF   = 1'b0
+
 )(
     input wire ui_clk,
     input wire rst_n,
@@ -117,6 +120,9 @@ always @(posedge ui_clk or negedge rst_n) begin
     if (!rst_n) begin
         wr_page      <= 1'b0;
         wr_page_done <= 1'b0;
+    end else if (SINGLE_BUF) begin
+        wr_page      <= 1'b0;          // 诊断：单缓冲，读写同一页
+        wr_page_done <= 1'b0;
     end else if (wr_frame_start) begin
         wr_page_done <= wr_page;      // 刚写完的那一页
         wr_page      <= ~wr_page;
@@ -132,6 +138,7 @@ always @(posedge ui_clk or negedge rst_n) begin
 end
 wire rd_page = rd_page_r;
 reg [2:0] wstate;
+reg       wr_rst_pending;
 reg [4:0] wbeat;
 reg [31:0] w_word_off;
 reg [127:0] w_word;
@@ -140,6 +147,7 @@ wire [31:0] w_burst_addr = (wr_page ? C_PAGE1_BASE : C_PAGE0_BASE) + (w_word_off
 always @(posedge ui_clk or negedge rst_n) begin
     if (!rst_n) begin
         wstate <= W_IDLE;
+        wr_rst_pending <= 1'b0;
         wbeat <= 5'd0;
         w_word_off <= 32'd0;
         w_word <= 128'd0;
@@ -164,7 +172,11 @@ always @(posedge ui_clk or negedge rst_n) begin
                 m_axi_wvalid <= 1'b0;
                 m_axi_bready <= 1'b0;
                 wbeat <= 5'd0;
-                if (w_word_off >= C_FRAME_WORDS)
+                if (wr_rst_pending) begin
+                    w_word_off    <= 32'd0;
+                    wr_rst_pending <= 1'b0;
+                end
+                else if (w_word_off >= C_FRAME_WORDS)
                     w_word_off <= 32'd0;
                 else if (startup_delay_done && wfifo_rcount >= BURST_WORDS_10) begin
                     m_axi_awaddr <= w_burst_addr;
@@ -221,7 +233,7 @@ always @(posedge ui_clk or negedge rst_n) begin
             default: wstate <= W_IDLE;
         endcase
         if (wr_frame_start)
-            w_word_off <= 32'd0;
+            wr_rst_pending <= 1'b1;   // 不立即归零，等 W_IDLE 再清
     end
 end
 
