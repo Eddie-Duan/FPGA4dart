@@ -469,9 +469,9 @@ wire [AW+8:0] cy_l = {9'd0, cy_w[AW-1:0]};
 wire [AW+8:0] ay_s = (cy_l >= up_t) ? (cy_l - up_t) : {(AW+9){1'b0}};
 
 //  同样的东西，但用「3 帧中值」后的外框（输出给下游用这个）
-wire [AW:0]     cx_f = (sl_f + sr_f) >> 1;
-wire [AW:0]     cy_f = (st_f + sb_f) >> 1;
-wire [AW:0]     bw_f = sr_f - sl_f + 1'b1;
+wire [AW:0]     cx_f = (sl_r + sr_r) >> 1;
+wire [AW:0]     cy_f = (st_r + sb_r) >> 1;
+wire [AW:0]     bw_f = sr_r - sl_r + 1'b1;
 wire [2*AW+8:0] up_full_f = bw_f * aim_h_q8;
 wire [AW+8:0]   up_t_f    = up_full_f >> 8;
 wire [AW+8:0]   cy_l_f    = {9'd0, cy_f[AW-1:0]};
