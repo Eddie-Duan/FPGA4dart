@@ -692,3 +692,51 @@ devmem 0x10010000 = 0x4140407B
 
 手动 `usb unbind/bind` 后 `/dev/ttyUSB*` 会变成 `crw------- root:root`
 （udev 规则没生效），普通用户打不开。解决：用 `sudo` 跑串口脚本。
+
+## 二十一、存档状态（2026-11-16）
+
+标签：`zynq-lcd-20251116`，提交 `be3edd4`。
+
+### 已完全打通
+
+| 环节 | 状态 |
+|---|---|
+| PetaLinux 2020.2 在板上启动（root/root） | ✅ |
+| 自动启动（SPI Flash 里的 U-Boot bootcmd） | ✅ |
+| 我们的 bitstream 由 U-Boot 从 SD 卡加载 | ✅ |
+| PS↔PL AXI（`devmem 0x43C00000` = `0x56495331` "VIS1"） | ✅ |
+| SD 卡可读写（`mmcblk0` 14.6 GiB） | ✅ |
+| OV5640 采集 → PS DDR3 帧缓冲 | ✅（`devmem 0x10000000` 有真实图像数据） |
+| LCD 显示摄像头画面 | ✅ |
+| 视觉流水线出结果（红圈套住目标、十字准星） | ✅ |
+
+### 关键修复回顾（按时间顺序）
+
+1. **UART/外设被禁用**：`petalinux-config --get-hw-description` 把 17 个 PS 外设
+   重置为 `status="disabled"`（含两个 UART），系统其实一直在跑但没有控制台。
+   用 meta-user 的 `system-user.dtsi` 覆盖启用 `uart0/sdhci0/gpio0` 并补 `serial0` 别名。
+2. **厂商 U-Boot 依赖 AXI GPIO@0x41200000**：缺这个从设备时 U-Boot 访问即挂死。
+   在 BD 里加 `axi_gpio` 并接 `M_AXI_GP0`。
+3. **FCLK_CLK1 未使能**（vendor 的 `ps7_init` 没开，写 SLCR 也救不回来）：
+   LCD/视觉域时钟改用 BD 里的 `clk_wiz` 从 FCLK0 产生。
+4. **`clk_div` 收到无效 LCD ID** 时走 default 分支输出常量 0 → 显示域全死。
+   强制 `lcd_id = 0x4384`（ATK-4384 800×480），`rd_id` 输出到废弃线。
+5. **像素时钟 25 MHz（45 Hz）** 导致面板时序不稳（滚动/闪烁）：
+   新增专用 `lcd_pix_clk` 端口，由 `clk_wiz_pix` 提供 **33.333 MHz（60 Hz）**，
+   `clk_div` 对 0x4384 直通。
+6. **消隐参数**：`H_SYNC` 128→48、`H_FRONT` 40→120（h_total 保持 1056）、
+   `V_SYNC` 2→3、`V_BACK` 33→32 —— 闪烁消失。
+
+### 已知问题（不影响主流程，留待以后）
+
+1. **画面未完全贴边**：四周仍有黑边/溢出边，有效窗口位置还需按实物微调
+   `H_BACK` / `V_BACK`（彩条测试已证明时序基准正确、画面不滚动）。
+   调试方法：`rtl/ov5640_lcd_zynq.v` 里把 `TEST_PAT` 置 1 出七色彩条，
+   对着实物调消隐参数，调好后改回 0。
+
+2. **移动目标时红圈周期性跳动（~0.1 s）**：静止目标正常。
+   ~0.1 s ≈ 3 帧 @30 fps，已定位到 `blob_track` 的 3 帧中值窗口；
+   当前版本把 `cx_f/cy_f/bw_f` 改为用当前帧原始外框（中值结果保留给下游），
+   现象仍在，说明根因不只在中值。后续可从
+   `temporal_acc`（多帧累积残留）和 `track_ab`（alpha-beta 跟踪）继续查。
+
